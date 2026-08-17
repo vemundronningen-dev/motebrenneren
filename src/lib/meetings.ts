@@ -1,13 +1,14 @@
 import "server-only";
-import { getSupabaseServiceClient } from "./supabase/server";
+import { NeonDbError } from "@neondatabase/serverless";
+import { sql } from "./db/client";
 import { generateSlug } from "./slug";
-import { meetingChannelName, MEETING_UPDATED_EVENT } from "./realtime";
 import { insertBurn } from "./burns";
 import { costForDuration } from "./calc";
 import type { MeetingStatus, PublicMeeting } from "./types";
 
 const MAX_ESTIMATED_SECONDS = 24 * 3600;
 const ABANDONED_AFTER_MS = 12 * 3600 * 1000;
+const UNIQUE_VIOLATION = "23505";
 
 export class MeetingError extends Error {
   code: "not_found" | "forbidden" | "invalid_state" | "validation";
@@ -22,7 +23,7 @@ interface Row {
   slug: string;
   started_at: string | null;
   estimated_seconds: number;
-  rate_per_hour: number;
+  rate_per_hour: string;
   participants: number;
   status: MeetingStatus;
   paused_total_seconds: number;
@@ -32,28 +33,32 @@ interface Row {
   created_at: string;
 }
 
-function toPublic(row: Row): PublicMeeting {
+async function toPublic(row: Row): Promise<PublicMeeting> {
+  const viewerCount = await getViewerCount(row.id);
   return {
     id: row.id,
     slug: row.slug,
     started_at: row.started_at,
     estimated_seconds: row.estimated_seconds,
-    rate_per_hour: row.rate_per_hour,
+    rate_per_hour: Number(row.rate_per_hour),
     participants: row.participants,
     status: row.status,
     paused_total_seconds: row.paused_total_seconds,
     paused_at: row.paused_at,
     ended_at: row.ended_at,
     created_at: row.created_at,
+    viewer_count: viewerCount,
   };
 }
 
-async function broadcastUpdate(slug: string, meeting: PublicMeeting) {
-  const supabase = getSupabaseServiceClient();
-  const channel = supabase.channel(meetingChannelName(slug));
-  await channel.httpSend(MEETING_UPDATED_EVENT, meeting).catch(() => {
-    // best effort - klienter faller tilbake til polling ved neste fetch
-  });
+async function getViewerCount(meetingId: string): Promise<number> {
+  const rows = await sql<{ count: number }>`
+    select count(*)::int as count
+    from meeting_presence
+    where meeting_id = ${meetingId}
+      and last_seen > now() - interval '25 seconds'
+  `;
+  return Number(rows[0]?.count ?? 0);
 }
 
 /** Lazy-avslutter møter som er eldre enn 12 timer og fortsatt ikke er ferdige. */
@@ -62,17 +67,14 @@ async function cleanupIfAbandoned(row: Row): Promise<Row> {
   const ageMs = Date.now() - new Date(row.created_at).getTime();
   if (ageMs < ABANDONED_AFTER_MS) return row;
 
-  const supabase = getSupabaseServiceClient();
   const endedAt = new Date(row.created_at).toISOString();
-  const { data } = await supabase
-    .from("live_meetings")
-    .update({ status: "ended", ended_at: endedAt, paused_at: null })
-    .eq("id", row.id)
-    .neq("status", "ended")
-    .select()
-    .maybeSingle();
-
-  return (data as Row) ?? { ...row, status: "ended", ended_at: endedAt, paused_at: null };
+  const rows = await sql<Row>`
+    update live_meetings
+    set status = 'ended', ended_at = ${endedAt}, paused_at = null
+    where id = ${row.id} and status <> 'ended'
+    returning *
+  `;
+  return rows[0] ?? { ...row, status: "ended", ended_at: endedAt, paused_at: null };
 }
 
 export interface CreateMeetingInput {
@@ -112,29 +114,23 @@ export async function createMeeting(
     }
   }
 
-  const supabase = getSupabaseServiceClient();
-
   for (let attempt = 0; attempt < 6; attempt++) {
     const slug = generateSlug();
-    const { data, error } = await supabase
-      .from("live_meetings")
-      .insert({
-        slug,
-        participants,
-        rate_per_hour: ratePerHour,
-        estimated_seconds: estimatedSeconds,
-        started_at: startedAt,
-        status,
-      })
-      .select("slug, host_token")
-      .single();
-
-    if (!error && data) {
-      return { slug: data.slug as string, hostToken: data.host_token as string };
-    }
-    // 23505 = unique_violation (slug-kollisjon) - prøv igjen med ny slug.
-    if (error && error.code !== "23505") {
-      throw new Error(`Kunne ikke opprette møte: ${error.message}`);
+    try {
+      const rows = await sql<{ slug: string; host_token: string }>`
+        insert into live_meetings
+          (slug, participants, rate_per_hour, estimated_seconds, started_at, status)
+        values
+          (${slug}, ${participants}, ${ratePerHour}, ${estimatedSeconds}, ${startedAt}, ${status})
+        returning slug, host_token
+      `;
+      const row = rows[0];
+      if (!row) throw new Error("Ingen rad returnert fra insert");
+      return { slug: row.slug, hostToken: row.host_token };
+    } catch (err) {
+      // Slug-kollisjon (unique_violation) - prøv igjen med en ny slug.
+      if (err instanceof NeonDbError && err.code === UNIQUE_VIOLATION) continue;
+      throw new Error(`Kunne ikke opprette møte: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -142,17 +138,28 @@ export async function createMeeting(
 }
 
 export async function getMeetingBySlug(slug: string): Promise<PublicMeeting | null> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("live_meetings")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+  const rows = await sql<Row>`select * from live_meetings where slug = ${slug} limit 1`;
+  const row = rows[0];
+  if (!row) return null;
 
-  if (error || !data) return null;
-
-  const cleaned = await cleanupIfAbandoned(data as Row);
+  const cleaned = await cleanupIfAbandoned(row);
   return toPublic(cleaned);
+}
+
+export async function recordHeartbeat(slug: string, sessionId: string): Promise<void> {
+  const rows = await sql<{ meeting_id: string }>`
+    insert into meeting_presence (meeting_id, session_id, last_seen)
+    select id, ${sessionId}, now() from live_meetings where slug = ${slug}
+    on conflict (meeting_id, session_id) do update set last_seen = now()
+    returning meeting_id
+  `;
+  const row = rows[0];
+  if (!row) return;
+  // Opportunistisk opprydding av gamle rader for dette møtet.
+  await sql`
+    delete from meeting_presence
+    where meeting_id = ${row.meeting_id} and last_seen < now() - interval '5 minutes'
+  `;
 }
 
 export type MeetingAction = "start" | "pause" | "resume" | "stop";
@@ -162,18 +169,12 @@ export async function performMeetingAction(
   hostToken: string,
   action: MeetingAction,
 ): Promise<PublicMeeting> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("live_meetings")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error || !data) {
+  const rows = await sql<Row>`select * from live_meetings where slug = ${slug} limit 1`;
+  let row = rows[0];
+  if (!row) {
     throw new MeetingError("not_found", "Fant ikke møtet");
   }
 
-  let row = data as Row;
   row = await cleanupIfAbandoned(row);
 
   if (row.host_token !== hostToken) {
@@ -183,95 +184,83 @@ export async function performMeetingAction(
     throw new MeetingError("invalid_state", "Møtet er allerede avsluttet");
   }
 
-  const nowIso = new Date().toISOString();
-
   if (action === "start") {
     if (row.status !== "lobby") {
       throw new MeetingError("invalid_state", "Møtet er allerede startet");
     }
-    const { data: updated, error: updErr } = await supabase
-      .from("live_meetings")
-      .update({ status: "running", started_at: nowIso })
-      .eq("id", row.id)
-      .eq("status", "lobby")
-      .select()
-      .maybeSingle();
-    if (updErr || !updated) {
-      throw new MeetingError("invalid_state", "Kunne ikke starte møtet");
-    }
-    row = updated as Row;
+    const updated = await sql<Row>`
+      update live_meetings
+      set status = 'running', started_at = now()
+      where id = ${row.id} and status = 'lobby'
+      returning *
+    `;
+    const next = updated[0];
+    if (!next) throw new MeetingError("invalid_state", "Kunne ikke starte møtet");
+    row = next;
   } else if (action === "pause") {
     if (row.status !== "running") {
       throw new MeetingError("invalid_state", "Møtet kjører ikke");
     }
-    const { data: updated, error: updErr } = await supabase
-      .from("live_meetings")
-      .update({ status: "paused", paused_at: nowIso })
-      .eq("id", row.id)
-      .eq("status", "running")
-      .select()
-      .maybeSingle();
-    if (updErr || !updated) {
-      throw new MeetingError("invalid_state", "Kunne ikke sette møtet på pause");
-    }
-    row = updated as Row;
+    const updated = await sql<Row>`
+      update live_meetings
+      set status = 'paused', paused_at = now()
+      where id = ${row.id} and status = 'running'
+      returning *
+    `;
+    const next = updated[0];
+    if (!next) throw new MeetingError("invalid_state", "Kunne ikke sette møtet på pause");
+    row = next;
   } else if (action === "resume") {
     if (row.status !== "paused" || !row.paused_at) {
       throw new MeetingError("invalid_state", "Møtet er ikke på pause");
     }
-    const pausedFor = Math.max(
-      0,
-      (Date.now() - new Date(row.paused_at).getTime()) / 1000,
-    );
-    const { data: updated, error: updErr } = await supabase
-      .from("live_meetings")
-      .update({
-        status: "running",
-        paused_total_seconds: Math.round(row.paused_total_seconds + pausedFor),
-        paused_at: null,
-      })
-      .eq("id", row.id)
-      .eq("status", "paused")
-      .select()
-      .maybeSingle();
-    if (updErr || !updated) {
-      throw new MeetingError("invalid_state", "Kunne ikke gjenoppta møtet");
-    }
-    row = updated as Row;
+    const updated = await sql<Row>`
+      update live_meetings
+      set
+        status = 'running',
+        paused_total_seconds = paused_total_seconds
+          + round(extract(epoch from (now() - paused_at)))::int,
+        paused_at = null
+      where id = ${row.id} and status = 'paused'
+      returning *
+    `;
+    const next = updated[0];
+    if (!next) throw new MeetingError("invalid_state", "Kunne ikke gjenoppta møtet");
+    row = next;
   } else if (action === "stop") {
     if (row.status !== "running" && row.status !== "paused") {
       throw new MeetingError("invalid_state", "Møtet kan ikke stoppes nå");
     }
-    const extraPause =
-      row.status === "paused" && row.paused_at
-        ? Math.max(0, (Date.now() - new Date(row.paused_at).getTime()) / 1000)
-        : 0;
-    const finalPausedTotal = Math.round(row.paused_total_seconds + extraPause);
+    // Atomisk: regner ut endelig paused_total_seconds og setter status til
+    // 'ended' i samme setning. `status <> 'ended'` garanterer at kun ett
+    // samtidig stopp-kall vinner racet - dermed inserer vi burns nøyaktig
+    // én gang uansett hvor mange ganger stopp skulle bli trigget parallelt.
+    const updated = await sql<Row>`
+      update live_meetings
+      set
+        status = 'ended',
+        ended_at = now(),
+        paused_total_seconds = paused_total_seconds
+          + case
+              when status = 'paused' and paused_at is not null
+                then round(extract(epoch from (now() - paused_at)))::int
+              else 0
+            end,
+        paused_at = null
+      where id = ${row.id} and status <> 'ended'
+      returning *
+    `;
+    const next = updated[0];
+    if (!next) throw new MeetingError("invalid_state", "Kunne ikke stoppe møtet");
+    row = next;
+
     const startedAtMs = row.started_at ? new Date(row.started_at).getTime() : Date.now();
-    const elapsed = Math.max(0, (Date.now() - startedAtMs) / 1000 - finalPausedTotal);
-
-    const { data: updated, error: updErr } = await supabase
-      .from("live_meetings")
-      .update({
-        status: "ended",
-        ended_at: nowIso,
-        paused_total_seconds: finalPausedTotal,
-        paused_at: null,
-      })
-      .eq("id", row.id)
-      .neq("status", "ended")
-      .select()
-      .maybeSingle();
-
-    if (updErr || !updated) {
-      throw new MeetingError("invalid_state", "Kunne ikke stoppe møtet");
-    }
-    row = updated as Row;
-
-    // Kun vertens/serverens stopp-kall sender inn beløpet - garantert
-    // maks én innsending per møte siden update-en over er atomisk
-    // (neq('status','ended') sørger for at bare ett kall vinner racet).
-    const amount = costForDuration(row.rate_per_hour, elapsed);
+    const endedAtMs = row.ended_at ? new Date(row.ended_at).getTime() : Date.now();
+    const elapsed = Math.max(
+      0,
+      (endedAtMs - startedAtMs) / 1000 - row.paused_total_seconds,
+    );
+    const amount = costForDuration(Number(row.rate_per_hour), elapsed);
     await insertBurn({
       amount,
       durationSeconds: elapsed,
@@ -280,7 +269,5 @@ export async function performMeetingAction(
     });
   }
 
-  const publicMeeting = toPublic(row);
-  await broadcastUpdate(slug, publicMeeting);
-  return publicMeeting;
+  return toPublic(row);
 }

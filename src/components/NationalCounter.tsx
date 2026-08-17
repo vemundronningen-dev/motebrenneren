@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatKr, formatNumber, formatPercent } from "@/lib/format";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { NATIONAL_COUNTER_CHANNEL, BURN_EVENT } from "@/lib/realtime";
 import type { NationalStats } from "@/lib/types";
 
 const MIN_RATE_PER_SECOND = 0.35;
-const RESYNC_INTERVAL_MS = 45_000;
+// Ingen realtime-infrastruktur tilgjengelig i denne oppsett (ren Postgres
+// via Neon, ingen pub/sub-lag) - vi henter derfor ferske tall med jevne
+// mellomrom i stedet for å motta en push når noen andre stopper et møte.
+// Telleren fortsetter å tikke jevnt lokalt mellom hver henting, så det
+// merkes ikke som et "hopp" i praksis, bare litt mindre umiddelbart enn en
+// ekte push ville vært.
+const POLL_INTERVAL_MS = 7_000;
 
 interface Baseline {
   total: number;
@@ -27,56 +31,32 @@ export default function NationalCounter({
 }) {
   const [displayed, setDisplayed] = useState(initialStats.total_sum);
   const [stats, setStats] = useState(initialStats);
-  const baselineRef = useRef<Baseline>({
-    total: initialStats.total_sum,
-    atMs: Date.now(),
-    ratePerSecond: computeRate(initialStats),
-  });
+  const baselineRef = useRef<Baseline | null>(null);
 
-  // Jevn oppover-animasjon, alltid i bevegelse.
+  // Jevn oppover-animasjon, alltid i bevegelse. Baseline settes i en effekt
+  // (ikke under render) siden Date.now() er en urein verdi.
   useEffect(() => {
+    baselineRef.current = {
+      total: initialStats.total_sum,
+      atMs: Date.now(),
+      ratePerSecond: computeRate(initialStats),
+    };
+
     let raf: number;
     const tick = () => {
       const b = baselineRef.current;
-      const elapsed = (Date.now() - b.atMs) / 1000;
-      setDisplayed(b.total + b.ratePerSecond * elapsed);
+      if (b) {
+        const elapsed = (Date.now() - b.atMs) / 1000;
+        setDisplayed(b.total + b.ratePerSecond * elapsed);
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Realtime: hver gang et møte et sted i Norge stoppes, hopper telleren.
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    const channel = supabase.channel(NATIONAL_COUNTER_CHANNEL);
-    channel
-      .on("broadcast", { event: BURN_EVENT }, (msg: { payload?: { amount?: number } }) => {
-        const amount = Number(msg.payload?.amount ?? 0);
-        if (!Number.isFinite(amount) || amount <= 0) return;
-        const b = baselineRef.current;
-        const elapsed = (Date.now() - b.atMs) / 1000;
-        const currentValue = b.total + b.ratePerSecond * elapsed;
-        baselineRef.current = {
-          total: currentValue + amount,
-          atMs: Date.now(),
-          ratePerSecond: b.ratePerSecond,
-        };
-        setStats((prev) => ({
-          ...prev,
-          total_sum: currentValue + amount,
-          total_meetings: prev.total_meetings + 1,
-          meetings_today: prev.meetings_today + 1,
-        }));
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Periodisk resync mot databasen for å rette opp evt. avdrift.
+  // Periodisk resync mot databasen - dette er "pushen" i praksis her.
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -92,7 +72,7 @@ export default function NationalCounter({
       } catch {
         // stille feiler - prøver igjen neste runde
       }
-    }, RESYNC_INTERVAL_MS);
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
 

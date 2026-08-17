@@ -4,18 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import LiveMeetingView from "@/components/LiveMeetingView";
 import SummaryView from "@/components/SummaryView";
 import ShareButton from "@/components/ShareButton";
-import type { REALTIME_SUBSCRIBE_STATES } from "@supabase/supabase-js";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { meetingChannelName, MEETING_UPDATED_EVENT } from "@/lib/realtime";
 import { getHostToken } from "@/lib/hostToken";
 import { costForDuration } from "@/lib/calc";
 import { formatKr } from "@/lib/format";
 import type { PublicMeeting } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 20_000;
+// Ingen realtime-infrastruktur i denne oppsett (ren Postgres via Neon) -
+// status og seertall hentes derfor med jevn polling i stedet for en push
+// når verten endrer status. Selve kr-telleren er upåvirket av dette: den
+// regnes lokalt 10x/sekund ut fra started_at/paused-feltene (server-tid),
+// så bare statusendringer (start/pause/resume/stopp) og seertallet er
+// avhengig av pollingen - et par sekunders forsinkelse på de er umerkelig.
+const POLL_INTERVAL_MS = 3_000;
+const HEARTBEAT_INTERVAL_MS = 10_000;
 
-function presenceKey(): string {
-  return Math.random().toString(36).slice(2);
+function newSessionId(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 export default function MeetingRoom({
@@ -26,45 +30,22 @@ export default function MeetingRoom({
   initialMeeting: PublicMeeting;
 }) {
   const [meeting, setMeeting] = useState(initialMeeting);
-  const [viewerCount, setViewerCount] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const hostTokenRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const token = getHostToken(slug);
     hostTokenRef.current = token;
     setIsHost(token != null);
+    sessionIdRef.current = newSessionId();
   }, [slug]);
 
+  // Poll for fersk status (og seertall) mens møtet ikke er avsluttet.
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    const channel = supabase.channel(meetingChannelName(slug), {
-      config: { presence: { key: presenceKey() } },
-    });
-
-    channel
-      .on("broadcast", { event: MEETING_UPDATED_EVENT }, (msg: { payload: PublicMeeting }) => {
-        setMeeting(msg.payload);
-      })
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        setViewerCount(Object.keys(state).length);
-      })
-      .subscribe(async (status: REALTIME_SUBSCRIBE_STATES) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({ online: true });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [slug]);
-
-  // Fallback: poll av og til i tilfelle en broadcast skulle forsvinne.
-  useEffect(() => {
+    if (meeting.status === "ended") return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/meetings/${slug}`, { cache: "no-store" });
@@ -74,7 +55,24 @@ export default function MeetingRoom({
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [slug]);
+  }, [slug, meeting.status]);
+
+  // Heartbeat for "X kolleger ser på" mens møtet ikke er avsluttet.
+  useEffect(() => {
+    if (meeting.status === "ended") return;
+    const send = () => {
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) return;
+      fetch(`/api/meetings/${slug}/heartbeat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
+    };
+    send();
+    const interval = setInterval(send, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [slug, meeting.status]);
 
   async function performAction(action: "start" | "pause" | "resume" | "stop") {
     const hostToken = hostTokenRef.current;
@@ -119,9 +117,9 @@ export default function MeetingRoom({
         <p className="text-xs text-muted max-w-xs">
           Ingen ser hva møtet handler om. Bare hva det koster.
         </p>
-        {viewerCount != null && (
-          <p className="text-xs text-muted">👀 {viewerCount} kolleger ser på</p>
-        )}
+        <p className="text-xs text-muted">
+          👀 {meeting.viewer_count} kolleger ser på
+        </p>
         {isHost ? (
           <button
             type="button"
@@ -155,7 +153,7 @@ export default function MeetingRoom({
       <LiveMeetingView
         meeting={meeting}
         isHost={isHost}
-        viewerCount={viewerCount}
+        viewerCount={meeting.viewer_count}
         actionLoading={actionLoading}
         onPause={() => performAction("pause")}
         onResume={() => performAction("resume")}

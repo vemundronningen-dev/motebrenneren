@@ -91,6 +91,7 @@ export default function StartPage() {
       participants: totalParticipants,
       status: "running",
       paused_total_seconds: 0,
+      viewer_count: 0,
       paused_at: null,
       ended_at: null,
       created_at: startedAt,

@@ -34,6 +34,8 @@ export interface PublicMeeting {
   paused_at: string | null;
   ended_at: string | null;
   created_at: string;
+  /** Antall aktive seere siste ~25 sek, basert på heartbeat-tabellen. */
+  viewer_count: number;
 }
 
 export interface NationalStats {

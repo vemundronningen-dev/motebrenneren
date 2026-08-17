@@ -5,13 +5,13 @@ sanntid — med delbare live-møterom for Teams-kolleger, en brennende
 tidslinje, og en nasjonal teller som viser hvor mye Norge totalt har
 brent i møter.
 
-Bygget med Next.js (App Router), Supabase (Postgres + Realtime +
-Presence) og Tailwind CSS.
+Bygget med Next.js (App Router), [Neon](https://neon.tech) (serverless
+Postgres) og Tailwind CSS.
 
 ## Innholdsfortegnelse
 
 - [Kom i gang lokalt](#kom-i-gang-lokalt)
-- [Supabase-oppsett](#supabase-oppsett)
+- [Database-oppsett (Neon)](#database-oppsett-neon)
 - [Miljøvariabler](#miljøvariabler)
 - [Arkitektur i korte trekk](#arkitektur-i-korte-trekk)
 - [Deploy til Vercel](#deploy-til-vercel)
@@ -21,75 +21,94 @@ Presence) og Tailwind CSS.
 ```bash
 npm install
 cp .env.local.example .env.local
-# fyll inn variablene, se "Miljøvariabler" under
+# fyll inn DATABASE_URL, se "Database-oppsett" under
 npm run dev
 ```
 
 Åpne [http://localhost:3000](http://localhost:3000).
 
-## Supabase-oppsett
+## Database-oppsett (Neon)
 
-1. Opprett et nytt prosjekt på [supabase.com](https://supabase.com).
-2. Kjør migrasjonen i `supabase/migrations/0001_init.sql`. To måter:
-
-   **A) Supabase CLI (anbefalt)**
+1. Opprett et prosjekt på [neon.tech](https://neon.tech) (eller bruk et
+   eksisterende).
+2. Kopier connection-strengen fra dashboardet (**Connection Details**).
+   Bruk gjerne varianten med `-pooler` i vertsnavnet – hver spørring går
+   uansett over HTTP (se arkitektur-notatet under), så pooling-egenskapen
+   i seg selv spiller mindre rolle her.
+3. Kjør skjemaet i `db/migrations/0001_init.sql`:
 
    ```bash
-   npx supabase login
-   npx supabase link --project-ref <ditt-prosjekt-ref>
-   npx supabase db push
+   psql "$DATABASE_URL" -f db/migrations/0001_init.sql
    ```
 
-   **B) SQL Editor i dashboardet**
+   Har du ikke `psql` installert kan du i stedet lime hele innholdet i
+   filen inn i Neon sitt **SQL Editor** i dashboardet og trykke Run.
 
-   Åpne prosjektet ditt → SQL Editor → lim inn hele innholdet i
-   `supabase/migrations/0001_init.sql` → Run.
+4. Legg connection-strengen inn som `DATABASE_URL` i `.env.local` (lokalt)
+   og i Vercel sine miljøvariabler (produksjon/preview).
 
-3. Sjekk at Realtime er aktivert for prosjektet (Database → Replication).
-   Migrasjonen legger selv til `burns` og `live_meetings` i
-   `supabase_realtime`-publikasjonen.
-
-### Hva migrasjonen setter opp
+### Hva skjemaet setter opp
 
 - **`burns`** – én rad per fullført møteforbrenning som teller mot den
-  nasjonale telleren. `anon`-rollen kan kun *inserte* (via
-  `/api/burns`), aldri lese enkeltrader.
-- **`live_meetings`** – delte møterom. `anon` kan lese via slug, men
-  `host_token`-kolonnen er eksplisitt utelatt fra kolonne-grantene til
-  `anon`, så den kan aldri hentes ut av en klient uansett RLS-policy.
-  All opprettelse og alle statusendringer (start/pause/resume/stopp)
-  skjer via API-ruter som bruker `service_role`-nøkkelen og
-  verifiserer `host_token` i applikasjonskode.
-- **`get_national_stats()`** – `security definer`-funksjon som er
-  eneste vei `anon` har til aggregerte tall (total sum, antall møter,
-  siste 24t, snittkostnad, andel over tid).
-- Sanntid mellom klienter går via **Supabase Realtime Broadcast**
-  (`channel.httpSend(...)`), ikke `postgres_changes` — se kommentaren
-  i `src/lib/realtime.ts` for hvorfor (kort versjon: RLS er
-  radnivå, ikke kolonnenivå, så `postgres_changes` ville i praksis
-  kunne lekke `host_token` til alle som kan se raden).
+  nasjonale telleren. Ingen navn, ingen møtetittel – bare beløp,
+  varighet, deltakerantall og tidspunkt.
+- **`live_meetings`** – delte møterom, inkl. den hemmelige
+  `host_token`-kolonnen som styrer hvem som kan starte/pause/stoppe.
+- **`meeting_presence`** – enkel heartbeat-tabell brukt til å telle
+  "kolleger som ser på" (se under).
+
+### Sikkerhetsmodell
+
+Databasen er **ikke** direkte tilgjengelig fra nettleseren (i motsetning
+til f.eks. Supabase sin PostgREST + RLS-modell). `DATABASE_URL` er en
+fulltillitt hemmelighet som kun leses server-side, i
+`src/lib/db/client.ts` (beskyttet med pakken `server-only`, som gir en
+build-feil hvis noen ved en feil prøver å importere den fra en
+`"use client"`-fil). All lesing og skriving går via Next.js sine
+API-ruter, som selv står for hele sikkerhetsmodellen:
+
+- `host_token` returneres aldri i noe JSON-svar – `toPublic()` i
+  `src/lib/meetings.ts` bygger alltid et eksplisitt, begrenset objekt.
+- Statusendringer (start/pause/resume/stopp) verifiserer `host_token`
+  server-side i `POST /api/meetings/[slug]/action` før noe skrives.
+- Beløp som telles mot den nasjonale telleren klippes server-side til
+  maks 3000 kr/t per deltaker, uansett hva klienten sender inn (se
+  `src/lib/burns.ts`).
 - Møterom eldre enn 12 timer avsluttes lazy (ingen cron) – se
-  `cleanupIfAbandoned` i `src/lib/meetings.ts`, som kjører hver gang
-  et møte leses.
+  `cleanupIfAbandoned` i `src/lib/meetings.ts`, som kjører hver gang et
+  møte leses.
+
+### Om sanntid (og hvorfor det er polling, ikke push)
+
+Ren Postgres/Neon har ikke noe innebygd pub/sub- eller
+websocket-lag slik Supabase Realtime har. Derfor:
+
+- **Nasjonaltelleren** henter ferske tall fra `/api/stats` hvert 7.
+  sekund, og fortsetter å tikke jevnt oppover lokalt mellom hver
+  henting (basert på kr/sekund fra siste 24t) – det merkes ikke som et
+  hopp i praksis.
+- **Delte møterom** poller `/api/meetings/[slug]` hvert 3. sekund for
+  statusendringer. Selve kr-telleren er upåvirket av dette: den regnes
+  lokalt 10 ganger i sekundet ut fra `started_at` / `paused_at` /
+  `status` (server-tid) for det enkelte møtet, så alle ser identisk
+  beløp uansett nettverkslag – pollingen trengs kun for å oppdage at
+  verten har trykket pause/stopp.
+- **"👀 X kolleger ser på"** er en enkel heartbeat: hver åpne fane
+  sender et `POST /api/meetings/[slug]/heartbeat` hvert 10. sekund, og
+  "antall som ser på" = antall rader i `meeting_presence` med
+  `last_seen` nyere enn 25 sekunder.
+
+Ønsker du ekte push senere (kortere forsinkelse, ingen polling), er det
+naturlige stedet å legge det til et eget sanntids-lag (f.eks. Pusher,
+Ably, eller Neon sin egen `LISTEN/NOTIFY` via en langlevd
+tilkobling/WebSocket-tjeneste ved siden av Vercel-funksjonene) – det er
+ikke noe i denne arkitekturen som er i veien for det.
 
 ## Miljøvariabler
 
 | Variabel | Hvor den brukes | Offentlig? |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Nettleser + server | Ja |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Nettleser + server | Ja |
-| `SUPABASE_SERVICE_ROLE_KEY` | Kun API-rutene under `src/app/api/meetings/**` | **Nei – aldri i nettleseren** |
-
-`SUPABASE_SERVICE_ROLE_KEY` er ikke nevnt i den offentlige
-NEXT_PUBLIC-listen, men er nødvendig for at vert-token-modellen for
-delte møter skal kunne verifiseres trygt server-side (se
-`src/lib/supabase/server.ts` – filen bruker pakken `server-only` for å
-garantere at den aldri kan importeres i klientkode). Nøkkelen finner
-du i Supabase-dashboardet under **Project Settings → API →
-service_role**.
-
-Sett alle tre i `.env.local` lokalt, og i **Vercel → Project Settings
-→ Environment Variables** for produksjon/preview.
+| `DATABASE_URL` | Kun server (`src/lib/db/client.ts`) | **Nei – aldri i nettleseren** |
 
 ## Arkitektur i korte trekk
 
@@ -100,18 +119,12 @@ Sett alle tre i `.env.local` lokalt, og i **Vercel → Project Settings
   Verten får en hemmelig `hostToken` lagret i `localStorage`
   (`src/lib/hostToken.ts`) og er eneste som kan trykke
   start/pause/stopp (`POST /api/meetings/[slug]/action`, som
-  verifiserer token server-side). Alle klienter beregner selv
-  kostnaden lokalt ut fra `started_at` / `paused_total_seconds` /
-  `status` (server-tid) — vi strømmer aldri selve tallet, kun
-  statusendringer, så alle viser identisk beløp uansett nettverkslag.
-  Ved stopp inserer *serveren* (ikke hver seer) beløpet i `burns` –
-  garantert maks én innsending per møte via en atomisk
-  statusoppdatering (`neq('status','ended')`).
-- **Nasjonaltelleren** (forsiden): henter `get_national_stats()`
-  server-side ved lasting, og animerer jevnt oppover basert på
-  kr/sekund fra siste 24t. Hver gang et møte stoppes noe sted i
-  Norge kringkastes beløpet på en `national-counter`-broadcastkanal,
-  og telleren hopper i sanntid.
+  verifiserer token server-side). Ved stopp inserer *serveren* (ikke
+  hver seer) beløpet i `burns` – garantert maks én innsending per møte
+  via en atomisk statusoppdatering (`where status <> 'ended'`).
+- **Nasjonaltelleren** (forsiden): henter aggregerte tall server-side
+  ved lasting, og animerer jevnt oppover basert på kr/sekund fra siste
+  24t, med periodisk resync (se over).
 - **Juksebeskyttelse**: lokale/egendefinerte rater i kalkulatoren kan
   være hva som helst og påvirker kun brukerens egen visning. Alt som
   faktisk telles mot Norges-telleren klippes server-side til maks
@@ -121,8 +134,7 @@ Sett alle tre i `.env.local` lokalt, og i **Vercel → Project Settings
 
 1. Push repoet til GitHub.
 2. Importer prosjektet i [Vercel](https://vercel.com/new).
-3. Legg inn de tre miljøvariablene fra tabellen over (Production +
-   Preview).
+3. Legg inn `DATABASE_URL` (Production + Preview).
 4. Deploy. Ingen ekstra build-steg trengs – `next build` er nok.
 5. Pek `motebrenneren.no` (eller din egen domene) til Vercel-prosjektet
    under **Domains**.

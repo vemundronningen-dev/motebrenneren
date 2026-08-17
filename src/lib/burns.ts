@@ -1,6 +1,5 @@
 import "server-only";
-import { getSupabaseAnonServerClient } from "./supabase/server";
-import { NATIONAL_COUNTER_CHANNEL, BURN_EVENT } from "./realtime";
+import { sql } from "./db/client";
 import { NATIONAL_MAX_RATE_PER_HOUR } from "./roles";
 
 export interface InsertBurnInput {
@@ -13,10 +12,9 @@ export interface InsertBurnInput {
 export class BurnValidationError extends Error {}
 
 /**
- * Validerer og setter inn en møteforbrenning i burns-tabellen, og
- * kringkaster den til den nasjonale telleren. Brukes både av
- * POST /api/burns (solo-flyt) og av stopp-handlingen for delte møter
- * (server-til-server, ingen ekstra HTTP-hopp).
+ * Validerer og setter inn en møteforbrenning i burns-tabellen. Brukes både
+ * av POST /api/burns (solo-flyt) og av stopp-handlingen for delte møter
+ * (kalt direkte fra server-koden, ingen ekstra HTTP-hopp).
  *
  * Uavhengig av hva brukeren har satt lokalt (egne rater kan være hva som
  * helst), klippes beløpet som faktisk telles mot Norge til makssatsen
@@ -44,22 +42,15 @@ export async function insertBurn(input: InsertBurnInput): Promise<{ amount: numb
   const maxAllowed = participants * NATIONAL_MAX_RATE_PER_HOUR * (durationSeconds / 3600);
   const amount = Math.min(input.amount, maxAllowed, 9999999);
 
-  const supabase = getSupabaseAnonServerClient();
-  const { error } = await supabase.from("burns").insert({
-    amount,
-    duration_seconds: Math.round(durationSeconds),
-    estimated_seconds: estimatedSeconds != null ? Math.round(estimatedSeconds) : null,
-    participants,
-  });
-
-  if (error) {
-    throw new Error(`Kunne ikke lagre forbrenning: ${error.message}`);
-  }
-
-  const channel = supabase.channel(NATIONAL_COUNTER_CHANNEL);
-  await channel.httpSend(BURN_EVENT, { amount }).catch(() => {
-    // Kringkasting er "best effort" - selve innsettingen har allerede lyktes.
-  });
+  await sql`
+    insert into burns (amount, duration_seconds, estimated_seconds, participants)
+    values (
+      ${amount},
+      ${Math.round(durationSeconds)},
+      ${estimatedSeconds != null ? Math.round(estimatedSeconds) : null},
+      ${participants}
+    )
+  `;
 
   return { amount };
 }
