@@ -1,16 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0908;
-  --background-raised: #14110f;
-  --foreground: #f5efe9;
-  --muted: #a89a8d;
+  --background: #faf6f1;
+  --background-raised: #ffffff;
+  --foreground: #221a14;
+  --muted: #6b5d51;
   --ember: #ff6a1f;
-  --ember-hot: #ffb143;
+  --ember-hot: #ff8a3d;
   --ember-deep: #c2270c;
-  --danger: #ff3b30;
-  --ash: #2a2422;
-  --line: #2b2521;
+  /* Mørkere, dempet gyllen aksentfarge for INLINE/liten tekst (kr/t,
+     prognoser o.l.) - --ember/--ember-hot er for knapper og store tall,
+     der mørk tekst-på-oransje eller store flater gir nok kontrast. Ved
+     liten skrift rett på lys bunn trenger vi en mørkere, mer mettet tone
+     for å holde god lesbarhet. */
+  --amber: #9a4c0a;
+  --danger: #d1301f;
+  --ash: #efe4d6;
+  --line: #e7dbca;
 }
 
 @theme inline {
@@ -21,17 +27,18 @@
   --color-ember: var(--ember);
   --color-ember-hot: var(--ember-hot);
   --color-ember-deep: var(--ember-deep);
+  --color-amber: var(--amber);
   --color-danger: var(--danger);
   --color-ash: var(--ash);
   --color-line: var(--line);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas,
     monospace;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -45,15 +52,97 @@ body {
   font-feature-settings: "tnum" 1;
 }
 
+/*
+ * Store tellere: rik, mettet oransje/rød fyllfarge (leser klart mørkt-på-
+ * lyst) med en myk, luftig glød bak selve teksten via en blurret
+ * radial-gradient-"halo" (::before). Ren "color" (ikke background-clip:
+ * text) brukes bevisst, siden den rullende siffer-telleren (RollingNumber)
+ * har hvert siffer i egne nøstede <span>-elementer - en background-clip-
+ * gradient på ytre wrapper arves ikke ned til dem og ville gjort sifrene
+ * usynlige. "color" arves derimot helt vanlig til alle etterkommere.
+ */
+.counter-glow {
+  position: relative;
+  color: var(--ember-deep);
+}
+
+.counter-glow::before {
+  content: "";
+  position: absolute;
+  inset: -30% -10%;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 106, 31, 0.22),
+    rgba(255, 106, 31, 0) 70%
+  );
+  filter: blur(8px);
+}
+
+.counter-glow-danger {
+  position: relative;
+  color: var(--danger);
+}
+
+.counter-glow-danger::before {
+  content: "";
+  position: absolute;
+  inset: -30% -10%;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(209, 48, 31, 0.2),
+    rgba(209, 48, 31, 0) 70%
+  );
+  filter: blur(8px);
+}
+
+@keyframes counter-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.counter-pulse {
+  display: inline-block;
+  transform-origin: center;
+  animation: counter-pulse 1.7s ease-in-out infinite;
+}
+
+@keyframes counter-pop-in {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.counter-pop-in {
+  display: inline-block;
+  animation: counter-pop-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.3);
+}
+
+/* Flakkende glød for selve flamme-ikonet (🔥) på tidslinjen - egen animasjon
+   fra tellerne over, siden et emoji-glyf ikke kan endre fyllfarge. */
 @keyframes flicker {
   0%,
   100% {
     opacity: 1;
-    filter: drop-shadow(0 0 6px var(--ember)) drop-shadow(0 0 14px var(--ember-deep));
+    filter: drop-shadow(0 0 6px var(--ember)) drop-shadow(0 0 12px var(--ember-deep));
   }
   50% {
-    opacity: 0.88;
-    filter: drop-shadow(0 0 10px var(--ember-hot)) drop-shadow(0 0 20px var(--ember-deep));
+    opacity: 0.9;
+    filter: drop-shadow(0 0 9px var(--ember-hot)) drop-shadow(0 0 16px var(--ember-deep));
   }
 }
 
@@ -79,10 +168,10 @@ body {
 @keyframes pulse-danger {
   0%,
   100% {
-    background-color: rgba(255, 59, 48, 0);
+    background-color: rgba(209, 48, 31, 0);
   }
   50% {
-    background-color: rgba(255, 59, 48, 0.08);
+    background-color: rgba(209, 48, 31, 0.06);
   }
 }
 
@@ -124,7 +213,28 @@ body {
   animation: poff 0.5s ease-out forwards;
 }
 
+@keyframes milestone-in {
+  0% {
+    transform: scale(0.4) translateY(10px);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.08) translateY(-2px);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.97) translateY(0);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+.milestone-in {
+  animation: milestone-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+}
+
 ::selection {
   background: var(--ember);
-  color: #1a0d05;
+  color: #fff8ef;
 }

@@ -88,7 +88,7 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
     <div className="flex w-full max-w-2xl flex-col items-center gap-6 text-center">
       <div>
         <p className="text-sm text-muted">Møtet er over. Regningen er klar.</p>
-        <div className="tabular mt-2 text-5xl sm:text-6xl font-black text-ember">
+        <div className="tabular mt-2 text-5xl sm:text-6xl font-black counter-glow counter-pop-in">
           {formatKr(amount)} kr
         </div>
       </div>

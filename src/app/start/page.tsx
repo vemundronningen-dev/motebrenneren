@@ -260,7 +260,7 @@ export default function StartPage() {
               <span className="text-sm text-muted">
                 {totalParticipants} deltakere · løpende total
               </span>
-              <span className="tabular text-lg font-bold text-ember">
+              <span className="tabular text-lg font-bold text-amber">
                 {formatKr(totalRatePerHour)} kr/t
               </span>
             </div>
@@ -276,7 +276,7 @@ export default function StartPage() {
           {estimatedMinutes != null && totalParticipants > 0 && (
             <p className="toast-in text-center text-sm text-muted">
               Dette møtet kommer til å koste ca.{" "}
-              <span className="font-bold text-ember">
+              <span className="font-bold text-amber">
                 {formatKr(estimatedCost)} kr
               </span>
             </p>

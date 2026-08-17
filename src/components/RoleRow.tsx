@@ -182,7 +182,7 @@ export default function RoleRow({
           type="button"
           {...incHold}
           aria-label={`Flere ${name}`}
-          className="h-8 w-8 rounded-full border border-ember/50 bg-ember/10 text-lg leading-none text-ember active:bg-ember/20 select-none"
+          className="h-8 w-8 rounded-full bg-ember text-lg leading-none font-bold text-[#1a0d05] active:bg-ember-hot select-none"
         >
           +
         </button>

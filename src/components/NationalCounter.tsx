@@ -82,7 +82,7 @@ export default function NationalCounter({
         Norge har brent
       </h1>
       <div
-        className="tabular font-black leading-none text-ember flame-flicker"
+        className="tabular font-black leading-none counter-glow counter-pulse"
         style={{ fontSize: "clamp(2.75rem, 13vw, 7rem)" }}
       >
         {formatKr(displayed)} kr

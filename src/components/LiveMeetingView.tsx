@@ -86,7 +86,7 @@ export default function LiveMeetingView({
       )}
 
       <div
-        className={`flex items-baseline ${overtime ? "text-danger" : "text-ember"}`}
+        className={`flex items-baseline counter-pulse ${overtime ? "counter-glow-danger" : "counter-glow"}`}
         style={{ fontSize: "clamp(2.5rem, 11vw, 5.5rem)" }}
       >
         <RollingNumber value={amount} className="font-black leading-none" />
@@ -102,7 +102,7 @@ export default function LiveMeetingView({
           <div className="text-xs text-danger font-semibold uppercase tracking-wide">
             Overtid
           </div>
-          <div className="tabular text-xl font-bold text-danger">
+          <div className="tabular text-xl font-bold text-foreground">
             +{formatKr(overtimeAmount)} kr
           </div>
         </div>

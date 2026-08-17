@@ -111,7 +111,7 @@ export default function MeetingRoom({
         <h1 className="text-2xl font-bold">Møtet har ikke startet</h1>
         <p className="text-muted max-w-sm">
           Prognose:{" "}
-          <span className="font-bold text-ember">{formatKr(prognosis)} kr</span>.
+          <span className="font-bold text-amber">{formatKr(prognosis)} kr</span>.
           Grue deg.
         </p>
         <p className="text-xs text-muted max-w-xs">

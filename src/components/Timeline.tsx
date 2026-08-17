@@ -42,6 +42,8 @@ export default function Timeline({
   const consumedRef = useRef<Set<number>>(new Set());
   const poffIdRef = useRef(0);
   const [poffs, setPoffs] = useState<Poff[]>([]);
+  const [trail, setTrail] = useState<Milestone[]>([]);
+  const trailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     for (const m of milestones) {
@@ -54,11 +56,17 @@ export default function Timeline({
         setTimeout(() => {
           setPoffs((prev) => prev.filter((p) => p.id !== id));
         }, 550);
+        setTrail((prev) => [...prev, m]);
         onMilestoneReached?.(m);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedSeconds]);
+
+  useEffect(() => {
+    const el = trailRef.current;
+    if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+  }, [trail.length]);
 
   const quarterMarks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({
     leftPct: f * MAIN_FRACTION * 100,
@@ -67,7 +75,7 @@ export default function Timeline({
 
   return (
     <div className="w-full select-none">
-      <div className="relative h-16 sm:h-20">
+      <div className="relative h-14 sm:h-16">
         {/* Spor */}
         <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full overflow-hidden bg-ash">
           <div
@@ -88,7 +96,7 @@ export default function Timeline({
               left: `${MAIN_FRACTION * 100}%`,
               right: 0,
               background:
-                "repeating-linear-gradient(135deg, rgba(255,59,48,0.35) 0 8px, rgba(20,17,15,0.9) 8px 16px)",
+                "repeating-linear-gradient(135deg, rgba(209,48,31,0.4) 0 8px, rgba(26,20,15,0.92) 8px 16px)",
             }}
           />
           {isOvertime && (
@@ -102,7 +110,7 @@ export default function Timeline({
           )}
         </div>
 
-        {/* Milepæl-markører */}
+        {/* Milepæl-markører: diskrete prikker på selve lunta */}
         {milestones.map((m) => {
           const sec = rps > 0 ? m.amount / rps : Infinity;
           const pct = timeToFraction(sec, estimatedSeconds) * 100;
@@ -110,16 +118,15 @@ export default function Timeline({
           return (
             <div
               key={m.amount}
-              className="absolute top-0 flex flex-col items-center"
-              style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+              style={{ left: `${pct}%` }}
               title={`${formatKr(m.amount)} kr – ${m.text}`}
             >
               <span
-                className={`text-[13px] transition-opacity ${consumed ? "opacity-30 grayscale" : "opacity-90"}`}
-              >
-                {m.emoji}
-              </span>
-              <span className="mt-6 h-2 w-px bg-line" />
+                className={`block h-1.5 w-1.5 rounded-full transition-colors ${
+                  consumed ? "bg-[#241a10]/60" : "bg-[#5b4632]"
+                }`}
+              />
             </div>
           );
         })}
@@ -166,6 +173,30 @@ export default function Timeline({
           {formatKr(estimatedTotalCost)} kr
         </span>
       </div>
+
+      {/* Brent-trail: milepæler dukker opp her etter hvert som flammen når dem */}
+      {trail.length > 0 && (
+        <div
+          ref={trailRef}
+          className="mt-4 flex items-stretch gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {trail.map((m, i) => (
+            <div
+              key={`${m.amount}-${i}`}
+              className="milestone-in flex shrink-0 items-center gap-2 rounded-xl border border-ember/25 bg-background-raised px-3 py-2"
+              style={{ animationDelay: `${Math.min(i, 15) * 40}ms` }}
+            >
+              <span className="text-lg leading-none">{m.emoji}</span>
+              <div className="leading-tight">
+                <div className="tabular text-xs font-bold text-amber">
+                  {formatKr(m.amount)} kr
+                </div>
+                <div className="max-w-[11rem] text-[11px] text-muted">{m.text}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
