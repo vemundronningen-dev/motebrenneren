@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/meetings";
+import { describeDbError } from "@/lib/dbErrorMessage";
 
 export async function POST(
   request: Request,
@@ -24,6 +25,6 @@ export async function POST(
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("POST /api/meetings/[slug]/heartbeat", err);
-    return NextResponse.json({ error: "Kunne ikke registrere heartbeat" }, { status: 500 });
+    return NextResponse.json({ error: describeDbError(err) }, { status: 500 });
   }
 }

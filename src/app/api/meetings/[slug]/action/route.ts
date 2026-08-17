@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { performMeetingAction, MeetingError, type MeetingAction } from "@/lib/meetings";
+import { describeDbError } from "@/lib/dbErrorMessage";
 
 const VALID_ACTIONS: MeetingAction[] = ["start", "pause", "resume", "stop"];
 
@@ -43,9 +44,6 @@ export async function POST(
       return NextResponse.json({ error: err.message }, { status });
     }
     console.error("POST /api/meetings/[slug]/action", err);
-    return NextResponse.json(
-      { error: "Kunne ikke utføre handlingen" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: describeDbError(err) }, { status: 500 });
   }
 }

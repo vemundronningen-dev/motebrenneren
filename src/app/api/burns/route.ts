@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { insertBurn, BurnValidationError } from "@/lib/burns";
+import { describeDbError } from "@/lib/dbErrorMessage";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -27,9 +28,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     console.error("POST /api/burns", err);
-    return NextResponse.json(
-      { error: "Kunne ikke lagre forbrenning" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: describeDbError(err) }, { status: 500 });
   }
 }

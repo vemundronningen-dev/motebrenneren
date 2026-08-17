@@ -140,7 +140,10 @@ export async function createMeeting(
     } catch (err) {
       // Slug-kollisjon (unique_violation) - prøv igjen med en ny slug.
       if (err instanceof NeonDbError && err.code === UNIQUE_VIOLATION) continue;
-      throw new Error(`Kunne ikke opprette møte: ${err instanceof Error ? err.message : err}`);
+      // Kast videre uendret (ikke pakket inn i en ny Error) slik at
+      // describeDbError() i API-ruten fortsatt kan lese err.code/.column
+      // fra en NeonDbError og gi en presis feilmelding.
+      throw err;
     }
   }
 
