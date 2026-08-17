@@ -21,7 +21,9 @@ export async function generateMetadata({
 
   const prognosis = costForDuration(meeting.rate_per_hour, meeting.estimated_seconds);
   const minutes = Math.round(meeting.estimated_seconds / 60);
-  const title = `🔥 Møte pågår – prognose ${formatKr(prognosis)} kr`;
+  const title = meeting.label
+    ? `🔥 ${meeting.label} pågår – prognose ${formatKr(prognosis)} kr`
+    : `🔥 Møte pågår – prognose ${formatKr(prognosis)} kr`;
   const description = `${meeting.participants} deltakere, ca. ${minutes} minutter. Følg med på hva møtet koster – live og anonymt.`;
 
   return {

@@ -85,6 +85,12 @@ export default function LiveMeetingView({
         </div>
       )}
 
+      {meeting.label && (
+        <p className="-mb-3 text-sm font-semibold uppercase tracking-wide text-amber">
+          {meeting.label}
+        </p>
+      )}
+
       <div
         className={`flex items-baseline counter-pulse ${overtime ? "counter-glow-danger" : "counter-glow"}`}
         style={{ fontSize: "clamp(2.5rem, 11vw, 5.5rem)" }}

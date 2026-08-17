@@ -4,6 +4,7 @@ import { sql } from "./db/client";
 import { generateSlug } from "./slug";
 import { insertBurn } from "./burns";
 import { costForDuration } from "./calc";
+import { sanitizeMeetingLabel } from "./meetingTypes";
 import type { MeetingStatus, PublicMeeting } from "./types";
 
 const MAX_ESTIMATED_SECONDS = 24 * 3600;
@@ -31,6 +32,7 @@ interface Row {
   ended_at: string | null;
   host_token: string;
   created_at: string;
+  label: string | null;
 }
 
 async function toPublic(row: Row): Promise<PublicMeeting> {
@@ -48,6 +50,7 @@ async function toPublic(row: Row): Promise<PublicMeeting> {
     ended_at: row.ended_at,
     created_at: row.created_at,
     viewer_count: viewerCount,
+    label: row.label,
   };
 }
 
@@ -83,12 +86,15 @@ export interface CreateMeetingInput {
   estimatedSeconds: number;
   /** Hvis møtet allerede kjører lokalt når "Del møtet" trykkes. */
   alreadyStartedAt?: string | null;
+  /** Valgfritt møtenavn/-type (f.eks. "Salgsmøte") - aldri agenda/tittel. */
+  label?: string | null;
 }
 
 export async function createMeeting(
   input: CreateMeetingInput,
 ): Promise<{ slug: string; hostToken: string }> {
   const { participants, ratePerHour, estimatedSeconds, alreadyStartedAt } = input;
+  const label = sanitizeMeetingLabel(input.label);
 
   if (!Number.isInteger(participants) || participants < 1 || participants > 500) {
     throw new MeetingError("validation", "Ugyldig antall deltakere");
@@ -119,9 +125,9 @@ export async function createMeeting(
     try {
       const rows = await sql<{ slug: string; host_token: string }>`
         insert into live_meetings
-          (slug, participants, rate_per_hour, estimated_seconds, started_at, status)
+          (slug, participants, rate_per_hour, estimated_seconds, started_at, status, label)
         values
-          (${slug}, ${participants}, ${ratePerHour}, ${estimatedSeconds}, ${startedAt}, ${status})
+          (${slug}, ${participants}, ${ratePerHour}, ${estimatedSeconds}, ${startedAt}, ${status}, ${label})
         returning slug, host_token
       `;
       const row = rows[0];
@@ -266,6 +272,7 @@ export async function performMeetingAction(
       durationSeconds: elapsed,
       estimatedSeconds: row.estimated_seconds,
       participants: row.participants,
+      label: row.label,
     });
   }
 

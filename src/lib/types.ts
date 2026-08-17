@@ -36,6 +36,8 @@ export interface PublicMeeting {
   created_at: string;
   /** Antall aktive seere siste ~25 sek, basert på heartbeat-tabellen. */
   viewer_count: number;
+  /** Valgfritt møtenavn/-type (f.eks. "Salgsmøte") - aldri agenda/tittel. */
+  label: string | null;
 }
 
 export interface NationalStats {

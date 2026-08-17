@@ -16,12 +16,19 @@ export default function PersonvernPage() {
           <section>
             <h2 className="font-semibold text-lg mb-1">Hva vi lagrer</h2>
             <p className="text-muted">
-              Når du stopper et møte lagrer vi kun: totalbeløpet, hvor lenge
+              Når du stopper et møte lagrer vi: totalbeløpet, hvor lenge
               møtet varte, hvor mange deltakere det hadde, og tidspunktet.
-              Ingen navn, ingen møtetittel, ingen agenda, ingen bedriftsnavn.
-              For delte møterom lagres i tillegg en tilfeldig møtekode
-              (f.eks. &quot;gul-elg-42&quot;) og satsene du selv har satt opp
-              – ingenting som identifiserer deg eller kollegene dine.
+              Ingen navn, ingen agenda, ingen bedriftsnavn. For delte
+              møterom lagres i tillegg en tilfeldig møtekode (f.eks.
+              &quot;gul-elg-42&quot;) og satsene du selv har satt opp –
+              ingenting som identifiserer deg eller kollegene dine.
+            </p>
+            <p className="mt-2 text-muted">
+              Du kan valgfritt merke møtet med en møtetype (f.eks.
+              &quot;Salgsmøte&quot; eller &quot;Statusmøte&quot;) slik at du
+              selv kan se igjen hva slags møter som koster mest – dette er
+              en kort kategori, ikke møtetittel eller agenda, og lagres kun
+              hvis du selv skriver noe inn.
             </p>
           </section>
 
@@ -30,9 +37,12 @@ export default function PersonvernPage() {
             <p className="text-muted">
               Vi bruker ingen sporings- eller analysecookies. Møtebrenneren
               lagrer noen innstillinger lokalt i nettleseren din
-              (localStorage) – som dine egne timepriser og hvilke møter du
-              har startet som vert – slik at du slipper å taste dem inn på
-              nytt. Dette forlater aldri enheten din og sendes ikke til oss.
+              (localStorage) – som dine egne timepriser, hvilke møter du
+              har startet som vert, og en personlig møtehistorikk (beløp,
+              møtetype, varighet) du kan se under &quot;Historikk&quot; –
+              slik at du slipper å taste ting inn på nytt og kan følge med
+              over tid. Dette forlater aldri enheten din og sendes ikke til
+              oss eller noen andre.
             </p>
           </section>
 

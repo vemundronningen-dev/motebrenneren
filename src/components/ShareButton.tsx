@@ -10,6 +10,7 @@ interface Props {
   alreadyStartedAt?: string | null;
   estimatedCost: number;
   existingSlug?: string | null;
+  label?: string | null;
   onShared: (slug: string) => void;
   className?: string;
 }
@@ -21,6 +22,7 @@ export default function ShareButton({
   alreadyStartedAt,
   estimatedCost,
   existingSlug,
+  label,
   onShared,
   className,
 }: Props) {
@@ -42,6 +44,7 @@ export default function ShareButton({
           ratePerHour,
           estimatedSeconds,
           alreadyStartedAt: alreadyStartedAt ?? null,
+          label: label ?? null,
         }),
       });
       const data = await res.json();
@@ -57,8 +60,9 @@ export default function ShareButton({
   }
 
   const url = slug ? `https://motebrenneren.no/m/${slug}` : "";
+  const labelPrefix = label ? `${label}: ` : "";
   const teamsText = slug
-    ? `⚠️ Dette møtet brenner penger LIVE: ${url} – følg med på hva det koster oss.`
+    ? `⚠️ ${labelPrefix}Dette møtet brenner penger LIVE: ${url} – følg med på hva det koster oss.`
     : "";
 
   async function copyLink() {

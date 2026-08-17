@@ -35,14 +35,16 @@ npm run dev
    Bruk gjerne varianten med `-pooler` i vertsnavnet – hver spørring går
    uansett over HTTP (se arkitektur-notatet under), så pooling-egenskapen
    i seg selv spiller mindre rolle her.
-3. Kjør skjemaet i `db/migrations/0001_init.sql`:
+3. Kjør migrasjonene i `db/migrations/`, i rekkefølge:
 
    ```bash
    psql "$DATABASE_URL" -f db/migrations/0001_init.sql
+   psql "$DATABASE_URL" -f db/migrations/0002_meeting_label.sql
    ```
 
    Har du ikke `psql` installert kan du i stedet lime hele innholdet i
-   filen inn i Neon sitt **SQL Editor** i dashboardet og trykke Run.
+   hver fil inn i Neon sitt **SQL Editor** i dashboardet og trykke Run,
+   én fil om gangen i nummerrekkefølge.
 
 4. Legg connection-strengen inn som `DATABASE_URL` i `.env.local` (lokalt)
    og i Vercel sine miljøvariabler (produksjon/preview).
@@ -50,8 +52,10 @@ npm run dev
 ### Hva skjemaet setter opp
 
 - **`burns`** – én rad per fullført møteforbrenning som teller mot den
-  nasjonale telleren. Ingen navn, ingen møtetittel – bare beløp,
-  varighet, deltakerantall og tidspunkt.
+  nasjonale telleren. Ingen navn, ingen agenda – bare beløp, varighet,
+  deltakerantall, tidspunkt, og en valgfri kort møtetype (`label`, f.eks.
+  "Salgsmøte") brukeren selv kan sette for å spore hva slags møter som
+  koster mest.
 - **`live_meetings`** – delte møterom, inkl. den hemmelige
   `host_token`-kolonnen som styrer hvem som kan starte/pause/stoppe.
 - **`meeting_presence`** – enkel heartbeat-tabell brukt til å telle
@@ -129,6 +133,15 @@ ikke noe i denne arkitekturen som er i veien for det.
   være hva som helst og påvirker kun brukerens egen visning. Alt som
   faktisk telles mot Norges-telleren klippes server-side til maks
   3000 kr/t per deltaker (`src/lib/burns.ts`).
+- **Møtetype/-navn**: valgfritt felt i oppsettet (`src/components/MeetingLabelPicker.tsx`)
+  med hurtigvalg (Allmøte, Salgsmøte, Statusmøte m.fl.) eller fritekst,
+  lagres som `label` på både `live_meetings` og `burns`. Vises på
+  live-skjermen, i lobbyen, i delingstekst/-bilde og i OG-tittelen.
+- **Lokal møtehistorikk** (`/historikk`): hver fullførte oppsummering
+  lagres i `localStorage` (`src/lib/useMeetingHistory.ts`) med beløp,
+  møtetype, varighet og dato - kun i den enkelte nettleseren, aldri på
+  serveren. Gir en enkel personlig oversikt gruppert på møtetype, uten
+  behov for innlogging.
 
 ## Deploy til Vercel
 

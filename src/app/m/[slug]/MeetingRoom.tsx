@@ -108,6 +108,11 @@ export default function MeetingRoom({
     return (
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center gap-6">
         <div className="text-4xl">⏳</div>
+        {meeting.label && (
+          <p className="-mb-2 text-sm font-semibold uppercase tracking-wide text-amber">
+            {meeting.label}
+          </p>
+        )}
         <h1 className="text-2xl font-bold">Møtet har ikke startet</h1>
         <p className="text-muted max-w-sm">
           Prognose:{" "}
@@ -140,6 +145,7 @@ export default function MeetingRoom({
           estimatedSeconds={meeting.estimated_seconds}
           estimatedCost={prognosis}
           existingSlug={slug}
+          label={meeting.label}
           onShared={() => {}}
           className="w-full max-w-sm"
         />
@@ -165,6 +171,7 @@ export default function MeetingRoom({
             estimatedSeconds={meeting.estimated_seconds}
             estimatedCost={0}
             existingSlug={slug}
+            label={meeting.label}
             onShared={() => {}}
             className="w-full max-w-sm"
           />

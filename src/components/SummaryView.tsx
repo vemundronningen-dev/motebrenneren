@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Timeline from "./Timeline";
 import { costComparison } from "@/lib/comparisons";
 import { judgeMeeting } from "@/lib/verdicts";
 import { generateShareImage } from "@/lib/shareImage";
+import { useMeetingHistory } from "@/lib/useMeetingHistory";
 import {
   costForDuration,
   elapsedSeconds as calcElapsed,
@@ -20,6 +21,8 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
   const [imgLoading, setImgLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
+  const { addEntry } = useMeetingHistory();
+  const savedRef = useRef(false);
 
   const duration = calcElapsed(meeting);
   const amount = costForDuration(meeting.rate_per_hour, duration);
@@ -36,7 +39,26 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
     finishedEarly,
   });
 
-  const summaryText = `🔥 Møtebrenneren-oppsummering\n${formatKr(amount)} kr brent på ${formatDuration(duration)} med ${meeting.participants} deltakere.\n${verdict.title}\nLike mye som ${comparison}.\nmotebrenneren.no`;
+  const summaryText = `🔥 Møtebrenneren-oppsummering${meeting.label ? ` – ${meeting.label}` : ""}\n${formatKr(amount)} kr brent på ${formatDuration(duration)} med ${meeting.participants} deltakere.\n${verdict.title}\nLike mye som ${comparison}.\nmotebrenneren.no`;
+
+  // Lagre i den lokale møtehistorikken - én gang per gang oppsummeringen
+  // faktisk vises (både solo-flyten og delte møter render denne samme
+  // komponenten når status blir "ended").
+  useEffect(() => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+    addEntry({
+      label: meeting.label,
+      amount,
+      durationSeconds: duration,
+      estimatedSeconds: meeting.estimated_seconds,
+      participants: meeting.participants,
+      wentOvertime: overtime,
+      endedAt: meeting.ended_at ?? new Date().toISOString(),
+      slug: meeting.slug || null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleCopyText() {
     try {
@@ -59,6 +81,7 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
         participants: meeting.participants,
         durationLabel: formatDuration(duration),
         progressFraction: progressFraction(duration, meeting.estimated_seconds),
+        label: meeting.label,
       });
       const file = new File([blob], "motebrenneren.png", { type: "image/png" });
       const nav = navigator as Navigator & {
@@ -87,6 +110,11 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
   return (
     <div className="flex w-full max-w-2xl flex-col items-center gap-6 text-center">
       <div>
+        {meeting.label && (
+          <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-amber">
+            {meeting.label}
+          </p>
+        )}
         <p className="text-sm text-muted">Møtet er over. Regningen er klar.</p>
         <div className="tabular mt-2 text-5xl sm:text-6xl font-black counter-glow counter-pop-in">
           {formatKr(amount)} kr
@@ -161,12 +189,14 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
       </div>
       {imgError && <p className="text-xs text-danger">{imgError}</p>}
 
-      <Link
-        href="/start"
-        className="mt-2 text-sm text-muted underline hover:text-foreground"
-      >
-        Start et nytt møte
-      </Link>
+      <div className="mt-2 flex items-center gap-4 text-sm">
+        <Link href="/start" className="text-muted underline hover:text-foreground">
+          Start et nytt møte
+        </Link>
+        <Link href="/historikk" className="text-muted underline hover:text-foreground">
+          Se møtehistorikk
+        </Link>
+      </div>
     </div>
   );
 }

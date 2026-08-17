@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import RoleRow from "@/components/RoleRow";
 import DurationPicker from "@/components/DurationPicker";
+import MeetingLabelPicker from "@/components/MeetingLabelPicker";
 import ShareButton from "@/components/ShareButton";
 import LiveMeetingView from "@/components/LiveMeetingView";
 import SummaryView from "@/components/SummaryView";
@@ -21,6 +22,7 @@ export default function StartPage() {
 
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(null);
+  const [label, setLabel] = useState("");
   const [phase, setPhase] = useState<Phase>("setup");
   const [meeting, setMeeting] = useState<PublicMeeting | null>(null);
   const [customName, setCustomName] = useState("");
@@ -95,6 +97,7 @@ export default function StartPage() {
       paused_at: null,
       ended_at: null,
       created_at: startedAt,
+      label: label.trim() || null,
     });
     setPhase("live");
   }
@@ -150,6 +153,7 @@ export default function StartPage() {
           durationSeconds: elapsed,
           estimatedSeconds: meeting.estimated_seconds,
           participants: meeting.participants,
+          label: meeting.label,
         }),
       });
     } catch {
@@ -268,6 +272,13 @@ export default function StartPage() {
 
           <section>
             <h2 className="text-sm font-semibold text-muted mb-2">
+              Møtetype (valgfritt)
+            </h2>
+            <MeetingLabelPicker label={label} onChange={setLabel} />
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-muted mb-2">
               Estimert varighet
             </h2>
             <DurationPicker minutes={estimatedMinutes} onChange={setEstimatedMinutes} />
@@ -287,6 +298,7 @@ export default function StartPage() {
             ratePerHour={totalRatePerHour}
             estimatedSeconds={estimatedSeconds || 900}
             estimatedCost={estimatedCost}
+            label={label}
             onShared={(slug) => router.push(`/m/${slug}`)}
           />
 
@@ -321,6 +333,7 @@ export default function StartPage() {
               estimatedSeconds={meeting.estimated_seconds}
               alreadyStartedAt={meeting.started_at}
               estimatedCost={estimatedCost}
+              label={meeting.label}
               onShared={(slug) => router.push(`/m/${slug}`)}
               className="w-full max-w-sm"
             />

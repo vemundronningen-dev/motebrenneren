@@ -11,6 +11,9 @@ export default function Footer() {
         <Link href="/" className="hover:text-foreground">
           Møtebrenneren
         </Link>
+        <Link href="/historikk" className="hover:text-foreground">
+          Historikk
+        </Link>
         <Link href="/personvern" className="hover:text-foreground">
           Personvern
         </Link>

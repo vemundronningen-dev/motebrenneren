@@ -19,13 +19,14 @@ export default async function Image({
     ? costForDuration(meeting.rate_per_hour, meeting.estimated_seconds)
     : 0;
   const minutes = meeting ? Math.round(meeting.estimated_seconds / 60) : 0;
+  const kind = meeting?.label ?? "Møtet";
   const statusLabel = !meeting
     ? "Møtet finnes ikke lenger"
     : meeting.status === "ended"
-      ? "Møtet er avsluttet"
+      ? `${kind} er avsluttet`
       : meeting.status === "lobby"
-        ? "Møtet venter på start"
-        : "Møte pågår LIVE";
+        ? `${kind} venter på start`
+        : `${kind} pågår LIVE`;
 
   return new ImageResponse(
     (

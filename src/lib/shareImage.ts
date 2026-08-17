@@ -7,6 +7,7 @@ export interface ShareImageParams {
   participants: number;
   durationLabel: string;
   progressFraction: number; // 0..1, hvor langt lunta brant
+  label?: string | null;
 }
 
 const W = 1200;
@@ -37,7 +38,11 @@ export async function generateShareImage(params: ShareImageParams): Promise<Blob
   ctx.fillStyle = "#a89a8d";
   ctx.font = "600 30px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Dette møtet kostet", W / 2, 150);
+  ctx.fillText(
+    params.label ? `${params.label} kostet` : "Dette møtet kostet",
+    W / 2,
+    150,
+  );
 
   // Beløp
   ctx.fillStyle = "#ff6a1f";

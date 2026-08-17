@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ugyldig JSON" }, { status: 400 });
   }
 
-  const { amount, durationSeconds, estimatedSeconds, participants } = (body ??
+  const { amount, durationSeconds, estimatedSeconds, participants, label } = (body ??
     {}) as Record<string, unknown>;
 
   try {
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       estimatedSeconds:
         estimatedSeconds == null ? null : Number(estimatedSeconds),
       participants: Number(participants),
+      label: typeof label === "string" ? label : null,
     });
     return NextResponse.json({ ok: true, amount: result.amount });
   } catch (err) {

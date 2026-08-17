@@ -1,12 +1,15 @@
 import "server-only";
 import { sql } from "./db/client";
 import { NATIONAL_MAX_RATE_PER_HOUR } from "./roles";
+import { sanitizeMeetingLabel } from "./meetingTypes";
 
 export interface InsertBurnInput {
   amount: number;
   durationSeconds: number;
   estimatedSeconds: number | null;
   participants: number;
+  /** Valgfritt møtenavn/-type (f.eks. "Salgsmøte") - aldri agenda/tittel. */
+  label?: string | null;
 }
 
 export class BurnValidationError extends Error {}
@@ -41,14 +44,16 @@ export async function insertBurn(input: InsertBurnInput): Promise<{ amount: numb
 
   const maxAllowed = participants * NATIONAL_MAX_RATE_PER_HOUR * (durationSeconds / 3600);
   const amount = Math.min(input.amount, maxAllowed, 9999999);
+  const label = sanitizeMeetingLabel(input.label);
 
   await sql`
-    insert into burns (amount, duration_seconds, estimated_seconds, participants)
+    insert into burns (amount, duration_seconds, estimated_seconds, participants, label)
     values (
       ${amount},
       ${Math.round(durationSeconds)},
       ${estimatedSeconds != null ? Math.round(estimatedSeconds) : null},
-      ${participants}
+      ${participants},
+      ${label}
     )
   `;
 
