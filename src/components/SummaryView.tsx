@@ -1,0 +1,181 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import Timeline from "./Timeline";
+import { costComparison } from "@/lib/comparisons";
+import { judgeMeeting } from "@/lib/verdicts";
+import { generateShareImage } from "@/lib/shareImage";
+import {
+  costForDuration,
+  elapsedSeconds as calcElapsed,
+  isOvertime as calcIsOvertime,
+  overtimeSeconds as calcOvertimeSeconds,
+  progressFraction,
+} from "@/lib/calc";
+import { formatDuration, formatKr } from "@/lib/format";
+import type { PublicMeeting } from "@/lib/types";
+
+export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
+  const [imgLoading, setImgLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
+
+  const duration = calcElapsed(meeting);
+  const amount = costForDuration(meeting.rate_per_hour, duration);
+  const overtime = calcIsOvertime(duration, meeting.estimated_seconds);
+  const overtimeSec = calcOvertimeSeconds(duration, meeting.estimated_seconds);
+  const overtimeAmount = costForDuration(meeting.rate_per_hour, overtimeSec);
+  const finishedEarly = !overtime && duration < meeting.estimated_seconds * 0.9;
+  const costPerHead = amount / Math.max(1, meeting.participants);
+  const comparison = costComparison(amount);
+  const verdict = judgeMeeting({
+    amount,
+    wentOvertime: overtime,
+    overtimeSeconds: overtimeSec,
+    finishedEarly,
+  });
+
+  const summaryText = `🔥 Møtebrenneren-oppsummering\n${formatKr(amount)} kr brent på ${formatDuration(duration)} med ${meeting.participants} deltakere.\n${verdict.title}\nLike mye som ${comparison}.\nmotebrenneren.no`;
+
+  async function handleCopyText() {
+    try {
+      await navigator.clipboard.writeText(summaryText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setImgError("Kunne ikke kopiere teksten.");
+    }
+  }
+
+  async function handleDownloadImage() {
+    setImgLoading(true);
+    setImgError(null);
+    try {
+      const blob = await generateShareImage({
+        amount,
+        verdictTitle: verdict.title,
+        comparison,
+        participants: meeting.participants,
+        durationLabel: formatDuration(duration),
+        progressFraction: progressFraction(duration, meeting.estimated_seconds),
+      });
+      const file = new File([blob], "motebrenneren.png", { type: "image/png" });
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files: File[] }) => boolean;
+        share?: (data: { files: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+      if (nav.canShare?.({ files: [file] }) && nav.share) {
+        await nav.share({ files: [file], title: "Møtebrenneren", text: summaryText });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "motebrenneren.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      setImgError("Kunne ikke lage bildet. Prøv kopier-som-tekst i stedet.");
+    } finally {
+      setImgLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex w-full max-w-2xl flex-col items-center gap-6 text-center">
+      <div>
+        <p className="text-sm text-muted">Møtet er over. Regningen er klar.</p>
+        <div className="tabular mt-2 text-5xl sm:text-6xl font-black text-ember">
+          {formatKr(amount)} kr
+        </div>
+      </div>
+
+      <div
+        className={`rounded-2xl border px-5 py-3 ${
+          verdict.badge === "hyllest"
+            ? "border-ember/40 bg-ember/10"
+            : verdict.badge === "skam"
+              ? "border-danger/40 bg-danger/10"
+              : "border-line bg-background-raised"
+        }`}
+      >
+        <div className="font-bold text-foreground">{verdict.title}</div>
+        <div className="mt-1 text-sm text-muted">{verdict.text}</div>
+      </div>
+
+      <div className="w-full">
+        <Timeline
+          elapsedSeconds={duration}
+          estimatedSeconds={meeting.estimated_seconds}
+          ratePerHour={meeting.rate_per_hour}
+        />
+      </div>
+
+      <div className="grid w-full grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <Stat label="Varighet" value={formatDuration(duration)} />
+        <Stat
+          label="Estimert"
+          value={formatDuration(meeting.estimated_seconds)}
+        />
+        <Stat label="Deltakere" value={String(meeting.participants)} />
+        <Stat label="Kr per hode" value={`${formatKr(costPerHead)} kr`} />
+      </div>
+
+      {overtime && (
+        <div className="w-full rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
+          <span className="font-semibold text-danger">
+            Overtid: {formatDuration(overtimeSec)} = {formatKr(overtimeAmount)} kr
+          </span>
+        </div>
+      )}
+
+      <p className="text-sm text-muted">
+        Dette møtet kostet like mye som{" "}
+        <span className="text-foreground font-medium">{comparison}</span>.
+      </p>
+
+      <div className="toast-in flex items-center gap-2 rounded-full border border-ember/30 bg-ember/10 px-4 py-2 text-sm">
+        <span>🇳🇴</span>
+        <span>Beløpet er lagt til Norges teller</span>
+      </div>
+
+      <div className="flex w-full flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={handleDownloadImage}
+          disabled={imgLoading}
+          className="flex-1 rounded-xl bg-ember px-4 py-3 text-sm font-bold text-[#1a0d05] disabled:opacity-50"
+        >
+          {imgLoading ? "Lager bilde…" : "📤 Del som bilde"}
+        </button>
+        <button
+          type="button"
+          onClick={handleCopyText}
+          className="flex-1 rounded-xl border border-line px-4 py-3 text-sm font-bold text-foreground hover:border-ember/50"
+        >
+          {copied ? "Kopiert! ✅" : "📋 Kopier som tekst"}
+        </button>
+      </div>
+      {imgError && <p className="text-xs text-danger">{imgError}</p>}
+
+      <Link
+        href="/start"
+        className="mt-2 text-sm text-muted underline hover:text-foreground"
+      >
+        Start et nytt møte
+      </Link>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-line bg-background-raised px-3 py-3">
+      <div className="tabular font-bold text-foreground">{value}</div>
+      <div className="mt-0.5 text-[11px] text-muted">{label}</div>
+    </div>
+  );
+}

@@ -1,0 +1,34 @@
+import { NextResponse } from "next/server";
+import { insertBurn, BurnValidationError } from "@/lib/burns";
+
+export async function POST(request: Request) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Ugyldig JSON" }, { status: 400 });
+  }
+
+  const { amount, durationSeconds, estimatedSeconds, participants } = (body ??
+    {}) as Record<string, unknown>;
+
+  try {
+    const result = await insertBurn({
+      amount: Number(amount),
+      durationSeconds: Number(durationSeconds),
+      estimatedSeconds:
+        estimatedSeconds == null ? null : Number(estimatedSeconds),
+      participants: Number(participants),
+    });
+    return NextResponse.json({ ok: true, amount: result.amount });
+  } catch (err) {
+    if (err instanceof BurnValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    console.error("POST /api/burns", err);
+    return NextResponse.json(
+      { error: "Kunne ikke lagre forbrenning" },
+      { status: 500 },
+    );
+  }
+}
