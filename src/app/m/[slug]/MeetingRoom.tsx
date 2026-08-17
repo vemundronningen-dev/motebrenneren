@@ -74,7 +74,10 @@ export default function MeetingRoom({
     return () => clearInterval(interval);
   }, [slug, meeting.status]);
 
-  async function performAction(action: "start" | "pause" | "resume" | "stop") {
+  async function performAction(
+    action: "start" | "pause" | "resume" | "stop",
+    overrideDurationSeconds?: number,
+  ) {
     const hostToken = hostTokenRef.current;
     if (!hostToken) return;
     setActionLoading(true);
@@ -83,7 +86,7 @@ export default function MeetingRoom({
       const res = await fetch(`/api/meetings/${slug}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostToken, action }),
+        body: JSON.stringify({ hostToken, action, overrideDurationSeconds }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Noe gikk galt");
@@ -163,7 +166,7 @@ export default function MeetingRoom({
         actionLoading={actionLoading}
         onPause={() => performAction("pause")}
         onResume={() => performAction("resume")}
-        onStop={() => performAction("stop")}
+        onStop={(overrideDurationSeconds) => performAction("stop", overrideDurationSeconds)}
         shareSlot={
           <ShareButton
             participants={meeting.participants}

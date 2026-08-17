@@ -33,6 +33,8 @@ interface Row {
   host_token: string;
   created_at: string;
   label: string | null;
+  final_duration_seconds: number | null;
+  final_amount: string | null;
 }
 
 async function toPublic(row: Row): Promise<PublicMeeting> {
@@ -51,6 +53,8 @@ async function toPublic(row: Row): Promise<PublicMeeting> {
     created_at: row.created_at,
     viewer_count: viewerCount,
     label: row.label,
+    final_duration_seconds: row.final_duration_seconds,
+    final_amount: row.final_amount != null ? Number(row.final_amount) : null,
   };
 }
 
@@ -174,6 +178,15 @@ export async function performMeetingAction(
   slug: string,
   hostToken: string,
   action: MeetingAction,
+  /**
+   * Kun brukt for action "stop". Lar verten korrigere varigheten som
+   * faktisk telles (typisk: glemte å trykke stopp i tide, og møtet har
+   * stått og "brent" i timevis etter at det egentlig var ferdig). Kan
+   * KUN forkorte - aldri forlenge utover reelt målt forløpt tid - slik
+   * at feltet ikke kan brukes til å late som møtet kostet mer enn det
+   * faktisk gjorde.
+   */
+  overrideDurationSeconds?: number,
 ): Promise<PublicMeeting> {
   const rows = await sql<Row>`select * from live_meetings where slug = ${slug} limit 1`;
   let row = rows[0];
@@ -262,10 +275,17 @@ export async function performMeetingAction(
 
     const startedAtMs = row.started_at ? new Date(row.started_at).getTime() : Date.now();
     const endedAtMs = row.ended_at ? new Date(row.ended_at).getTime() : Date.now();
-    const elapsed = Math.max(
+    const measuredElapsed = Math.max(
       0,
       (endedAtMs - startedAtMs) / 1000 - row.paused_total_seconds,
     );
+    const elapsed =
+      overrideDurationSeconds != null &&
+      Number.isFinite(overrideDurationSeconds) &&
+      overrideDurationSeconds > 0 &&
+      overrideDurationSeconds <= measuredElapsed
+        ? overrideDurationSeconds
+        : measuredElapsed;
     const amount = costForDuration(Number(row.rate_per_hour), elapsed);
     await insertBurn({
       amount,
@@ -274,6 +294,18 @@ export async function performMeetingAction(
       participants: row.participants,
       label: row.label,
     });
+
+    // Lagre det endelige resultatet på selve møtet også, slik at
+    // lobby/summary-skjermene viser det korrigerte tallet (ikke et som er
+    // regnet ut på nytt fra de rå tidsstemplene, som fortsatt viser hele
+    // den virkelige forløpte tiden).
+    const finalized = await sql<Row>`
+      update live_meetings
+      set final_duration_seconds = ${Math.round(elapsed)}, final_amount = ${amount}
+      where id = ${row.id}
+      returning *
+    `;
+    if (finalized[0]) row = finalized[0];
   }
 
   return toPublic(row);

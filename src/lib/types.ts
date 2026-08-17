@@ -38,6 +38,15 @@ export interface PublicMeeting {
   viewer_count: number;
   /** Valgfritt møtenavn/-type (f.eks. "Salgsmøte") - aldri agenda/tittel. */
   label: string | null;
+  /**
+   * Satt når møtet avsluttes - den faktiske varigheten/beløpet som telles,
+   * som kan være kortere enn started_at→ended_at hvis verten korrigerte
+   * for at møtet sto åpent lenge etter at det egentlig var ferdig. Bruk
+   * disse (ikke started_at/ended_at) for å vise et avsluttet møtes
+   * resultat - null mens møtet fortsatt pågår.
+   */
+  final_duration_seconds: number | null;
+  final_amount: number | null;
 }
 
 export interface NationalStats {

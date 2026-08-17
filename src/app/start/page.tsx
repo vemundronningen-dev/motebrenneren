@@ -98,6 +98,8 @@ export default function StartPage() {
       ended_at: null,
       created_at: startedAt,
       label: label.trim() || null,
+      final_duration_seconds: null,
+      final_amount: null,
     });
     setPhase("live");
   }
@@ -121,7 +123,7 @@ export default function StartPage() {
     });
   }
 
-  async function handleStop() {
+  async function handleStop(overrideDurationSeconds?: number) {
     if (!meeting) return;
     setSubmitting(true);
     const endedAt = new Date().toISOString();
@@ -133,7 +135,18 @@ export default function StartPage() {
     const startedAtMs = meeting.started_at
       ? new Date(meeting.started_at).getTime()
       : Date.now();
-    const elapsed = Math.max(0, (Date.now() - startedAtMs) / 1000 - finalPausedTotal);
+    const measuredElapsed = Math.max(
+      0,
+      (Date.now() - startedAtMs) / 1000 - finalPausedTotal,
+    );
+    // Verten kan korte ned varigheten (glemte å stoppe i tide), men aldri
+    // forlenge den utover det som faktisk gikk med - se StopConfirmPanel.
+    const elapsed =
+      overrideDurationSeconds != null &&
+      overrideDurationSeconds > 0 &&
+      overrideDurationSeconds <= measuredElapsed
+        ? overrideDurationSeconds
+        : measuredElapsed;
     const amount = costForDuration(meeting.rate_per_hour, elapsed);
 
     const ended: PublicMeeting = {
@@ -142,6 +155,8 @@ export default function StartPage() {
       ended_at: endedAt,
       paused_total_seconds: finalPausedTotal,
       paused_at: null,
+      final_duration_seconds: Math.round(elapsed),
+      final_amount: amount,
     };
 
     try {
@@ -299,6 +314,8 @@ export default function StartPage() {
             estimatedSeconds={estimatedSeconds || 900}
             estimatedCost={estimatedCost}
             label={label}
+            disabled={!canStart}
+            disabledReason="Legg til minst én deltaker og velg varighet før du kan dele."
             onShared={(slug) => router.push(`/m/${slug}`)}
           />
 

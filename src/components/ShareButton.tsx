@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { saveHostToken } from "@/lib/hostToken";
 
 interface Props {
@@ -13,6 +13,8 @@ interface Props {
   label?: string | null;
   onShared: (slug: string) => void;
   className?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export default function ShareButton({
@@ -25,14 +27,22 @@ export default function ShareButton({
   label,
   onShared,
   className,
+  disabled,
+  disabledReason,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [slug, setSlug] = useState<string | null>(existingSlug ?? null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Satt i en effekt (ikke lest direkte fra window under render) for å
+  // unngå hydrerings-mismatch mellom server- og klient-render.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   async function handleClick() {
-    if (slug) return; // allerede delt - vis lenke-panelet
+    if (slug || disabled) return; // allerede delt, eller ikke klar ennå
     setLoading(true);
     setError(null);
     try {
@@ -59,13 +69,19 @@ export default function ShareButton({
     }
   }
 
-  const url = slug ? `https://motebrenneren.no/m/${slug}` : "";
+  // Bruker faktisk opprinnelse (window.location.origin) i stedet for en
+  // hardkodet motebrenneren.no - ellers peker delte lenker feil sted når
+  // appen kjører på en Vercel preview-URL eller før det egendefinerte
+  // domenet er koblet til.
+  const url = slug && origin ? `${origin}/m/${slug}` : "";
+  const linkDisplay = slug ? `${origin.replace(/^https?:\/\//, "")}/m/${slug}` : "";
   const labelPrefix = label ? `${label}: ` : "";
   const teamsText = slug
     ? `⚠️ ${labelPrefix}Dette møtet brenner penger LIVE: ${url} – følg med på hva det koster oss.`
     : "";
 
   async function copyLink() {
+    if (!teamsText) return;
     try {
       await navigator.clipboard.writeText(teamsText);
       setCopied(true);
@@ -76,7 +92,7 @@ export default function ShareButton({
   }
 
   async function webShare() {
-    if (!slug) return;
+    if (!slug || !url) return;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -100,19 +116,21 @@ export default function ShareButton({
         <p className="text-sm text-muted mb-2">Møtet er delbart:</p>
         <div className="flex items-center gap-2 flex-wrap">
           <code className="tabular flex-1 min-w-0 truncate rounded bg-ash px-2 py-1.5 text-sm text-foreground">
-            motebrenneren.no/m/{slug}
+            {linkDisplay || "Laster lenke…"}
           </code>
           <button
             type="button"
             onClick={copyLink}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:border-ember/50"
+            disabled={!url}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:border-ember/50 disabled:opacity-50"
           >
             {copied ? "Kopiert! ✅" : "Kopier lenke"}
           </button>
           <button
             type="button"
             onClick={webShare}
-            className="rounded-lg bg-ember px-3 py-1.5 text-sm font-medium text-[#1a0d05]"
+            disabled={!url}
+            className="rounded-lg bg-ember px-3 py-1.5 text-sm font-medium text-[#1a0d05] disabled:opacity-50"
           >
             Del
           </button>
@@ -126,12 +144,15 @@ export default function ShareButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={loading}
-        className="w-full rounded-xl border border-line bg-background-raised px-4 py-3 text-sm font-semibold text-foreground transition hover:border-ember/50 disabled:opacity-50"
+        disabled={loading || disabled}
+        className="w-full rounded-xl border border-line bg-background-raised px-4 py-3 text-sm font-semibold text-foreground transition hover:border-ember/50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "Oppretter møterom…" : "🔗 Del møtet med kollegaer"}
       </button>
-      {estimatedCost > 0 && (
+      {disabled && disabledReason && (
+        <p className="mt-1.5 text-center text-xs text-muted">{disabledReason}</p>
+      )}
+      {!disabled && estimatedCost > 0 && (
         <p className="mt-1.5 text-center text-xs text-muted">
           Kollegaer ser samme brennende teller, live.
         </p>

@@ -16,7 +16,10 @@ export async function POST(
     return NextResponse.json({ error: "Ugyldig JSON" }, { status: 400 });
   }
 
-  const { hostToken, action } = (body ?? {}) as Record<string, unknown>;
+  const { hostToken, action, overrideDurationSeconds } = (body ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   if (typeof hostToken !== "string" || !hostToken) {
     return NextResponse.json({ error: "Mangler vert-token" }, { status: 401 });
@@ -26,7 +29,12 @@ export async function POST(
   }
 
   try {
-    const meeting = await performMeetingAction(slug, hostToken, action as MeetingAction);
+    const meeting = await performMeetingAction(
+      slug,
+      hostToken,
+      action as MeetingAction,
+      typeof overrideDurationSeconds === "number" ? overrideDurationSeconds : undefined,
+    );
     return NextResponse.json(meeting);
   } catch (err) {
     if (err instanceof MeetingError) {

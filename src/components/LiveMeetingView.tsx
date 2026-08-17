@@ -36,10 +36,11 @@ export default function LiveMeetingView({
   shareSlot?: React.ReactNode;
   onPause?: () => void;
   onResume?: () => void;
-  onStop?: () => void;
+  onStop?: (overrideDurationSeconds?: number) => void;
   actionLoading?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [confirmingStop, setConfirmingStop] = useState(false);
   const { toasts, push } = useToasts();
   const overtimeConsumedRef = useRef<Set<number>>(new Set());
 
@@ -127,7 +128,16 @@ export default function LiveMeetingView({
         {formatPercent(Math.min(progressPct, 999))} % av møtet brukt
       </div>
 
-      {isHost && (
+      {isHost && confirmingStop && (
+        <StopConfirmPanel
+          elapsedSeconds={elapsed}
+          actionLoading={actionLoading}
+          onCancel={() => setConfirmingStop(false)}
+          onConfirm={(overrideSeconds) => onStop?.(overrideSeconds)}
+        />
+      )}
+
+      {isHost && !confirmingStop && (
         <div className="flex gap-3">
           {isPaused ? (
             <button
@@ -150,7 +160,7 @@ export default function LiveMeetingView({
           )}
           <button
             type="button"
-            onClick={onStop}
+            onClick={() => setConfirmingStop(true)}
             disabled={actionLoading}
             className="rounded-full bg-danger px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
           >
@@ -162,6 +172,86 @@ export default function LiveMeetingView({
       {shareSlot}
 
       <ToastStack toasts={toasts} />
+    </div>
+  );
+}
+
+function StopConfirmPanel({
+  elapsedSeconds,
+  actionLoading,
+  onCancel,
+  onConfirm,
+}: {
+  elapsedSeconds: number;
+  actionLoading?: boolean;
+  onCancel: () => void;
+  onConfirm: (overrideDurationSeconds?: number) => void;
+}) {
+  // Fryses ved åpning - ellers ville "grensen" krype oppover mens
+  // bekreftelsespanelet står åpent, siden møtet fortsatt tikker i
+  // bakgrunnen helt til handlingen faktisk bekreftes.
+  const [measuredMinutes] = useState(() => Math.max(1, Math.round(elapsedSeconds / 60)));
+  const [minutes, setMinutes] = useState(String(measuredMinutes));
+
+  // Under 2 minutter er det ingenting fornuftig å korrigere til (nedre
+  // grense er uansett 1 min) - da bare forvirrer et redigerbart felt med
+  // "mellom 1 og 1" mer enn det hjelper, så vis kun en enkel bekreftelse.
+  const canAdjust = measuredMinutes >= 2;
+
+  const parsed = Math.round(Number(minutes));
+  const valid = Number.isFinite(parsed) && parsed >= 1 && parsed <= measuredMinutes;
+  const edited = canAdjust && parsed !== measuredMinutes;
+
+  return (
+    <div className="w-full max-w-sm rounded-2xl border border-line bg-background-raised p-4">
+      <p className="text-sm font-semibold text-foreground">
+        {canAdjust
+          ? `Møtet har vart i ${measuredMinutes} min. Stemmer det?`
+          : "Møtet har akkurat startet. Sikker på at du vil stoppe?"}
+      </p>
+      {canAdjust && (
+        <>
+          <p className="mt-1 text-xs text-muted">
+            Glemte du å stoppe i tide? Sett inn hvor lenge møtet egentlig
+            varte - du kan bare korte ned, ikke forlenge.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={measuredMinutes}
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+              className="tabular w-24 rounded-lg border border-line bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ember"
+            />
+            <span className="text-sm text-muted">min</span>
+          </div>
+          {!valid && (
+            <p className="mt-1.5 text-xs text-danger">
+              Kan ikke være mer enn {measuredMinutes} min.
+            </p>
+          )}
+        </>
+      )}
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={actionLoading}
+          className="flex-1 rounded-lg border border-line px-4 py-2 text-sm font-medium text-foreground disabled:opacity-50"
+        >
+          Avbryt
+        </button>
+        <button
+          type="button"
+          onClick={() => onConfirm(edited ? parsed * 60 : undefined)}
+          disabled={actionLoading || !valid}
+          className="flex-1 rounded-lg bg-danger px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+        >
+          {actionLoading ? "Stopper…" : "Bekreft og avslutt"}
+        </button>
+      </div>
     </div>
   );
 }

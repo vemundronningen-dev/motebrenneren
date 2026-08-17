@@ -40,6 +40,7 @@ npm run dev
    ```bash
    psql "$DATABASE_URL" -f db/migrations/0001_init.sql
    psql "$DATABASE_URL" -f db/migrations/0002_meeting_label.sql
+   psql "$DATABASE_URL" -f db/migrations/0003_final_duration.sql
    ```
 
    Har du ikke `psql` installert kan du i stedet lime hele innholdet i
@@ -142,6 +143,15 @@ ikke noe i denne arkitekturen som er i veien for det.
   møtetype, varighet og dato - kun i den enkelte nettleseren, aldri på
   serveren. Gir en enkel personlig oversikt gruppert på møtetype, uten
   behov for innlogging.
+- **Korrigere varighet ved stopp**: for møter man glemte å avslutte i
+  tide, viser "Stopp møtet" en bekreftelse (`StopConfirmPanel` i
+  `src/components/LiveMeetingView.tsx`) der verten kan korte ned den
+  varigheten som faktisk telles, aldri forlenge den utover reelt målt
+  tid. Det korrigerte resultatet lagres eksplisitt på møtet
+  (`final_duration_seconds`/`final_amount`, migrasjon 0003) i stedet
+  for å alltid regnes ut på nytt fra de rå tidsstemplene - ellers ville
+  lobby/summary-skjermene fortsatt vist den uncorrected, for lange
+  varigheten.
 
 ## Deploy til Vercel
 

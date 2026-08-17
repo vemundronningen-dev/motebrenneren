@@ -17,14 +17,27 @@ export function costForDuration(ratePerHour: number, seconds: number): number {
  * server-tid (started_at / paused_at / paused_total_seconds / status),
  * ikke en strømmet telleverdi. Alle klienter regner ut samme tall lokalt
  * fra de samme feltene, uansett nettverkslag.
+ *
+ * For et avsluttet møte brukes final_duration_seconds hvis satt, i stedet
+ * for å regne ut på nytt fra de rå tidsstemplene - verten kan ha korrigert
+ * varigheten ved stopp (f.eks. glemte å stoppe i tide), og da stemmer ikke
+ * lenger started_at→ended_at med det som faktisk telles.
  */
 export function elapsedSeconds(
   meeting: Pick<
     PublicMeeting,
-    "started_at" | "status" | "paused_total_seconds" | "paused_at" | "ended_at"
+    | "started_at"
+    | "status"
+    | "paused_total_seconds"
+    | "paused_at"
+    | "ended_at"
+    | "final_duration_seconds"
   >,
   now: number = Date.now(),
 ): number {
+  if (meeting.status === "ended" && meeting.final_duration_seconds != null) {
+    return meeting.final_duration_seconds;
+  }
   if (!meeting.started_at) return 0;
 
   const startedAtMs = new Date(meeting.started_at).getTime();

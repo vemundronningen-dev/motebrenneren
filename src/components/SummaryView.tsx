@@ -25,7 +25,9 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
   const savedRef = useRef(false);
 
   const duration = calcElapsed(meeting);
-  const amount = costForDuration(meeting.rate_per_hour, duration);
+  // Bruk det lagrede endelige beløpet når det finnes (kan avvike fra en
+  // rå ny utregning med noen øre pga. avrunding av korrigert varighet).
+  const amount = meeting.final_amount ?? costForDuration(meeting.rate_per_hour, duration);
   const overtime = calcIsOvertime(duration, meeting.estimated_seconds);
   const overtimeSec = calcOvertimeSeconds(duration, meeting.estimated_seconds);
   const overtimeAmount = costForDuration(meeting.rate_per_hour, overtimeSec);
