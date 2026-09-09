@@ -122,6 +122,13 @@ export default function MeetingRoom({
           <span className="font-bold text-amber">{formatKr(prognosis)} kr</span>.
           Grue deg.
         </p>
+        {meeting.case_value != null && meeting.case_value > 0 && (
+          <p className="text-xs text-muted max-w-xs">
+            {prognosis >= meeting.case_value
+              ? "🚩 Det er mer enn saken selv er verdt."
+              : `Det er ${Math.round((prognosis / meeting.case_value) * 100)} % av sakens verdi (${formatKr(meeting.case_value)} kr).`}
+          </p>
+        )}
         <p className="text-xs text-muted max-w-xs">
           Ingen ser hva møtet handler om. Bare hva det koster.
         </p>
@@ -149,6 +156,7 @@ export default function MeetingRoom({
           estimatedCost={prognosis}
           existingSlug={slug}
           label={meeting.label}
+          caseValue={meeting.case_value}
           onShared={() => {}}
           className="w-full max-w-sm"
         />
@@ -175,6 +183,7 @@ export default function MeetingRoom({
             estimatedCost={0}
             existingSlug={slug}
             label={meeting.label}
+            caseValue={meeting.case_value}
             onShared={() => {}}
             className="w-full max-w-sm"
           />

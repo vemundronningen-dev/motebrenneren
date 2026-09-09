@@ -16,6 +16,7 @@ import {
 } from "@/lib/calc";
 import { formatKr, formatPercent } from "@/lib/format";
 import { OVERTIME_TOASTS } from "@/lib/milestones";
+import { caseValuePercent } from "@/lib/caseValueComparison";
 import type { PublicMeeting } from "@/lib/types";
 
 const OVERTIME_TOAST_TRIGGERS_SEC = [0, 10 * 60];
@@ -55,6 +56,11 @@ export default function LiveMeetingView({
   const overtimeSec = calcOvertimeSeconds(elapsed, meeting.estimated_seconds);
   const overtimeAmount = costForDuration(meeting.rate_per_hour, overtimeSec);
   const progressPct = progressFraction(elapsed, meeting.estimated_seconds) * 100;
+  const caseValuePct =
+    meeting.case_value != null && meeting.case_value > 0
+      ? caseValuePercent(amount, meeting.case_value)
+      : null;
+  const caseValueExceeded = caseValuePct != null && caseValuePct >= 100;
 
   useEffect(() => {
     if (!overtime) return;
@@ -67,6 +73,14 @@ export default function LiveMeetingView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overtime, overtimeSec]);
+
+  const caseValueCrossedRef = useRef(false);
+  useEffect(() => {
+    if (caseValueExceeded && !caseValueCrossedRef.current) {
+      caseValueCrossedRef.current = true;
+      push("🚩 Møtet koster nå mer enn saken det skal avgjøre er verdt.");
+    }
+  }, [caseValueExceeded, push]);
 
   const isPaused = meeting.status === "paused";
 
@@ -127,6 +141,16 @@ export default function LiveMeetingView({
       <div className="text-xs text-muted tabular">
         {formatPercent(Math.min(progressPct, 999))} % av møtet brukt
       </div>
+
+      {caseValuePct != null && (
+        <div
+          className={`text-xs tabular ${caseValueExceeded ? "font-semibold text-danger" : "text-muted"}`}
+        >
+          {caseValueExceeded && "🚩 "}
+          {formatPercent(Math.min(caseValuePct, 999))} % av sakens verdi (
+          {formatKr(meeting.case_value ?? 0)} kr) brukt
+        </div>
+      )}
 
       {isHost && confirmingStop && (
         <StopConfirmPanel

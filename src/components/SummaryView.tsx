@@ -5,6 +5,7 @@ import Link from "next/link";
 import Timeline from "./Timeline";
 import { costComparison } from "@/lib/comparisons";
 import { judgeMeeting } from "@/lib/verdicts";
+import { judgeCaseValue } from "@/lib/caseValueComparison";
 import { generateShareImage } from "@/lib/shareImage";
 import { useMeetingHistory } from "@/lib/useMeetingHistory";
 import {
@@ -40,8 +41,12 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
     overtimeSeconds: overtimeSec,
     finishedEarly,
   });
+  const caseValueVerdict =
+    meeting.case_value != null && meeting.case_value > 0
+      ? judgeCaseValue(amount, meeting.case_value)
+      : null;
 
-  const summaryText = `🔥 Møtebrenneren-oppsummering${meeting.label ? ` – ${meeting.label}` : ""}\n${formatKr(amount)} kr brent på ${formatDuration(duration)} med ${meeting.participants} deltakere.\n${verdict.title}\nLike mye som ${comparison}.\nmotebrenneren.no`;
+  const summaryText = `🔥 Møtebrenneren-oppsummering${meeting.label ? ` – ${meeting.label}` : ""}\n${formatKr(amount)} kr brent på ${formatDuration(duration)} med ${meeting.participants} deltakere.\n${verdict.title}\nLike mye som ${comparison}.${caseValueVerdict ? `\n${caseValueVerdict.title} (saken var verdt ${formatKr(meeting.case_value ?? 0)} kr)` : ""}\nmotebrenneren.no`;
 
   // Lagre i den lokale møtehistorikken - én gang per gang oppsummeringen
   // faktisk vises (både solo-flyten og delte møter render denne samme
@@ -58,6 +63,7 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
       wentOvertime: overtime,
       endedAt: meeting.ended_at ?? new Date().toISOString(),
       slug: meeting.slug || null,
+      caseValue: meeting.case_value,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -159,6 +165,28 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
           <span className="font-semibold text-danger">
             Overtid: {formatDuration(overtimeSec)} = {formatKr(overtimeAmount)} kr
           </span>
+        </div>
+      )}
+
+      {caseValueVerdict && (
+        <div
+          className={`w-full rounded-xl border px-4 py-3 text-sm ${
+            caseValueVerdict.badge === "shame"
+              ? "border-danger/40 bg-danger/10"
+              : caseValueVerdict.badge === "warning"
+                ? "border-amber/40 bg-amber/10"
+                : "border-ember/40 bg-ember/10"
+          }`}
+        >
+          <div
+            className={`font-semibold ${caseValueVerdict.badge === "shame" ? "text-danger" : "text-foreground"}`}
+          >
+            {caseValueVerdict.title}
+          </div>
+          <div className="mt-0.5 text-muted">
+            {caseValueVerdict.text} Saken var verdt{" "}
+            {formatKr(meeting.case_value ?? 0)} kr.
+          </div>
         </div>
       )}
 

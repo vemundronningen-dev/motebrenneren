@@ -41,6 +41,7 @@ npm run dev
    psql "$DATABASE_URL" -f db/migrations/0001_init.sql
    psql "$DATABASE_URL" -f db/migrations/0002_meeting_label.sql
    psql "$DATABASE_URL" -f db/migrations/0003_final_duration.sql
+   psql "$DATABASE_URL" -f db/migrations/0004_case_value.sql
    ```
 
    Har du ikke `psql` installert kan du i stedet lime hele innholdet i
@@ -152,6 +153,13 @@ ikke noe i denne arkitekturen som er i veien for det.
   for å alltid regnes ut på nytt fra de rå tidsstemplene - ellers ville
   lobby/summary-skjermene fortsatt vist den uncorrected, for lange
   varigheten.
+- **Verdien av saken** (`case_value`, migrasjon 0004): valgfritt felt i
+  oppsettet (`src/components/CaseValueInput.tsx`) for å benchmarke
+  møtekostnaden mot det møtet faktisk skal avgjøre - klassikeren er ti
+  konsulenter i timevis for å avgjøre hulltaking av ti hull i et bygg
+  til 5 000 kr. Vises som en løpende prosentandel på live-skjermen
+  (`src/lib/caseValueComparison.ts`), med en 🚩-dom hvis møtet ender
+  opp med å koste mer enn saken selv er verdt.
 
 ## Deploy til Vercel
 

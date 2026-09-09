@@ -19,3 +19,11 @@ export function sanitizeMeetingLabel(raw: string | null | undefined): string | n
   const trimmed = raw.trim().slice(0, MEETING_LABEL_MAX_LENGTH);
   return trimmed.length > 0 ? trimmed : null;
 }
+
+export const MAX_CASE_VALUE = 1_000_000_000_000;
+
+/** Valgfri anslått verdi av saken/anskaffelsen møtet skal avgjøre, i kr. */
+export function sanitizeCaseValue(raw: number | null | undefined): number | null {
+  if (raw == null || !Number.isFinite(raw) || raw < 0) return null;
+  return Math.min(raw, MAX_CASE_VALUE);
+}

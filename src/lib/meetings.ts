@@ -4,7 +4,7 @@ import { sql } from "./db/client";
 import { generateSlug } from "./slug";
 import { insertBurn } from "./burns";
 import { costForDuration } from "./calc";
-import { sanitizeMeetingLabel } from "./meetingTypes";
+import { sanitizeMeetingLabel, sanitizeCaseValue } from "./meetingTypes";
 import type { MeetingStatus, PublicMeeting } from "./types";
 
 const MAX_ESTIMATED_SECONDS = 24 * 3600;
@@ -35,6 +35,7 @@ interface Row {
   label: string | null;
   final_duration_seconds: number | null;
   final_amount: string | null;
+  case_value: string | null;
 }
 
 async function toPublic(row: Row): Promise<PublicMeeting> {
@@ -55,6 +56,7 @@ async function toPublic(row: Row): Promise<PublicMeeting> {
     label: row.label,
     final_duration_seconds: row.final_duration_seconds,
     final_amount: row.final_amount != null ? Number(row.final_amount) : null,
+    case_value: row.case_value != null ? Number(row.case_value) : null,
   };
 }
 
@@ -92,6 +94,8 @@ export interface CreateMeetingInput {
   alreadyStartedAt?: string | null;
   /** Valgfritt møtenavn/-type (f.eks. "Salgsmøte") - aldri agenda/tittel. */
   label?: string | null;
+  /** Valgfri anslått verdi av saken møtet skal avgjøre, i kr. */
+  caseValue?: number | null;
 }
 
 export async function createMeeting(
@@ -99,6 +103,7 @@ export async function createMeeting(
 ): Promise<{ slug: string; hostToken: string }> {
   const { participants, ratePerHour, estimatedSeconds, alreadyStartedAt } = input;
   const label = sanitizeMeetingLabel(input.label);
+  const caseValue = sanitizeCaseValue(input.caseValue);
 
   if (!Number.isInteger(participants) || participants < 1 || participants > 500) {
     throw new MeetingError("validation", "Ugyldig antall deltakere");
@@ -129,9 +134,9 @@ export async function createMeeting(
     try {
       const rows = await sql<{ slug: string; host_token: string }>`
         insert into live_meetings
-          (slug, participants, rate_per_hour, estimated_seconds, started_at, status, label)
+          (slug, participants, rate_per_hour, estimated_seconds, started_at, status, label, case_value)
         values
-          (${slug}, ${participants}, ${ratePerHour}, ${estimatedSeconds}, ${startedAt}, ${status}, ${label})
+          (${slug}, ${participants}, ${ratePerHour}, ${estimatedSeconds}, ${startedAt}, ${status}, ${label}, ${caseValue})
         returning slug, host_token
       `;
       const row = rows[0];
@@ -296,6 +301,7 @@ export async function performMeetingAction(
       estimatedSeconds: row.estimated_seconds,
       participants: row.participants,
       label: row.label,
+      caseValue: row.case_value != null ? Number(row.case_value) : null,
     });
 
     // Lagre det endelige resultatet på selve møtet også, slik at

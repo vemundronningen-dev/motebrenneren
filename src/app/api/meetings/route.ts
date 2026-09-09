@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ugyldig JSON" }, { status: 400 });
   }
 
-  const { participants, ratePerHour, estimatedSeconds, alreadyStartedAt, label } =
+  const { participants, ratePerHour, estimatedSeconds, alreadyStartedAt, label, caseValue } =
     (body ?? {}) as Record<string, unknown>;
 
   try {
@@ -21,6 +21,7 @@ export async function POST(request: Request) {
       alreadyStartedAt:
         typeof alreadyStartedAt === "string" ? alreadyStartedAt : null,
       label: typeof label === "string" ? label : null,
+      caseValue: typeof caseValue === "number" ? caseValue : null,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {

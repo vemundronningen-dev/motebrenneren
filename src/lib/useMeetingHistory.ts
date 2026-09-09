@@ -15,6 +15,7 @@ export interface HistoryEntry {
   wentOvertime: boolean;
   endedAt: string;
   slug: string | null;
+  caseValue: number | null;
 }
 
 function readEntries(): HistoryEntry[] {

@@ -11,6 +11,7 @@ interface Props {
   estimatedCost: number;
   existingSlug?: string | null;
   label?: string | null;
+  caseValue?: number | null;
   onShared: (slug: string) => void;
   className?: string;
   disabled?: boolean;
@@ -25,6 +26,7 @@ export default function ShareButton({
   estimatedCost,
   existingSlug,
   label,
+  caseValue,
   onShared,
   className,
   disabled,
@@ -55,6 +57,7 @@ export default function ShareButton({
           estimatedSeconds,
           alreadyStartedAt: alreadyStartedAt ?? null,
           label: label ?? null,
+          caseValue: caseValue ?? null,
         }),
       });
       const data = await res.json();

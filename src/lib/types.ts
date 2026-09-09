@@ -47,6 +47,13 @@ export interface PublicMeeting {
    */
   final_duration_seconds: number | null;
   final_amount: number | null;
+  /**
+   * Valgfri anslått verdi av saken/anskaffelsen møtet skal avgjøre, i kr.
+   * Brukes til å benchmarke møtekostnaden mot selve beslutningen - typisk
+   * eksempel: ti konsulenter i timevis for å avgjøre hulltaking av ti hull
+   * i et bygg til 5 000 kr.
+   */
+  case_value: number | null;
 }
 
 export interface NationalStats {

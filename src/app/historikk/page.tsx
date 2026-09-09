@@ -132,6 +132,14 @@ export default function HistorikkPage() {
                             Overtid
                           </span>
                         )}
+                        {e.caseValue != null && e.caseValue > 0 && e.amount >= e.caseValue && (
+                          <span
+                            className="shrink-0 rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-semibold text-danger"
+                            title={`Saken var verdt ${formatKr(e.caseValue)} kr`}
+                          >
+                            🚩 Dyrere enn saken
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 text-xs text-muted">
                         {new Date(e.endedAt).toLocaleDateString("nb-NO", {

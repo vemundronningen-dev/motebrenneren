@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import RoleRow from "@/components/RoleRow";
 import DurationPicker from "@/components/DurationPicker";
 import MeetingLabelPicker from "@/components/MeetingLabelPicker";
+import CaseValueInput from "@/components/CaseValueInput";
 import ShareButton from "@/components/ShareButton";
 import LiveMeetingView from "@/components/LiveMeetingView";
 import SummaryView from "@/components/SummaryView";
@@ -23,6 +24,7 @@ export default function StartPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(null);
   const [label, setLabel] = useState("");
+  const [caseValueRaw, setCaseValueRaw] = useState("");
   const [phase, setPhase] = useState<Phase>("setup");
   const [meeting, setMeeting] = useState<PublicMeeting | null>(null);
   const [customName, setCustomName] = useState("");
@@ -47,6 +49,7 @@ export default function StartPage() {
   );
   const estimatedSeconds = estimatedMinutes ? estimatedMinutes * 60 : 0;
   const estimatedCost = costForDuration(totalRatePerHour, estimatedSeconds);
+  const caseValue = caseValueRaw ? Number(caseValueRaw) : null;
 
   const canStart = totalParticipants > 0 && estimatedMinutes != null;
 
@@ -100,6 +103,7 @@ export default function StartPage() {
       label: label.trim() || null,
       final_duration_seconds: null,
       final_amount: null,
+      case_value: caseValue,
     });
     setPhase("live");
   }
@@ -169,6 +173,7 @@ export default function StartPage() {
           estimatedSeconds: meeting.estimated_seconds,
           participants: meeting.participants,
           label: meeting.label,
+          caseValue: meeting.case_value,
         }),
       });
     } catch {
@@ -299,12 +304,28 @@ export default function StartPage() {
             <DurationPicker minutes={estimatedMinutes} onChange={setEstimatedMinutes} />
           </section>
 
+          <section>
+            <h2 className="text-sm font-semibold text-muted mb-2">
+              Verdien av saken (valgfritt)
+            </h2>
+            <CaseValueInput value={caseValueRaw} onChange={setCaseValueRaw} />
+          </section>
+
           {estimatedMinutes != null && totalParticipants > 0 && (
             <p className="toast-in text-center text-sm text-muted">
               Dette møtet kommer til å koste ca.{" "}
               <span className="font-bold text-amber">
                 {formatKr(estimatedCost)} kr
               </span>
+              {caseValue != null && caseValue > 0 && (
+                <>
+                  {" "}
+                  –{" "}
+                  {estimatedCost >= caseValue
+                    ? "🚩 mer enn saken selv er verdt"
+                    : `${Math.round((estimatedCost / caseValue) * 100)} % av sakens verdi`}
+                </>
+              )}
             </p>
           )}
 
@@ -314,6 +335,7 @@ export default function StartPage() {
             estimatedSeconds={estimatedSeconds || 900}
             estimatedCost={estimatedCost}
             label={label}
+            caseValue={caseValue}
             disabled={!canStart}
             disabledReason="Legg til minst én deltaker og velg varighet før du kan dele."
             onShared={(slug) => router.push(`/m/${slug}`)}
@@ -351,6 +373,7 @@ export default function StartPage() {
               alreadyStartedAt={meeting.started_at}
               estimatedCost={estimatedCost}
               label={meeting.label}
+              caseValue={meeting.case_value}
               onShared={(slug) => router.push(`/m/${slug}`)}
               className="w-full max-w-sm"
             />
