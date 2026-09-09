@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NationalCounter from "@/components/NationalCounter";
+import { SponsorBannerCard } from "@/components/SponsorBanner";
 import { getNationalStats } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export default async function HomePage() {
             teller – synkront, uansett hvem som glemte å trykke mute.
           </p>
         </section>
+
+        <SponsorBannerCard />
       </div>
     </main>
   );

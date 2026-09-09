@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SponsorBannerCompact } from "./SponsorBanner";
 
 export default function Footer() {
   return (
@@ -18,6 +19,7 @@ export default function Footer() {
           Personvern
         </Link>
       </p>
+      <SponsorBannerCompact />
     </footer>
   );
 }
