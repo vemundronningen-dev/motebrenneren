@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatKr, formatMinutes } from "@/lib/format";
-import { milestonesForTimeline, type Milestone } from "@/lib/milestones";
+import { milestonesForTimeline, nextUpcomingMilestone, type Milestone } from "@/lib/milestones";
 import { ratePerSecond, costForDuration } from "@/lib/calc";
 
 const MAIN_FRACTION = 0.76;
@@ -26,16 +26,32 @@ export default function Timeline({
   estimatedSeconds,
   ratePerHour,
   onMilestoneReached,
+  showNextTeaser,
 }: {
   elapsedSeconds: number;
   estimatedSeconds: number;
   ratePerHour: number;
   onMilestoneReached?: (m: Milestone) => void;
+  /** Vis "neste opp"-teaseren - kun for et faktisk pågående møte, ikke en frosset oppsummering. */
+  showNextTeaser?: boolean;
 }) {
   const rps = ratePerSecond(ratePerHour);
   const estimatedTotalCost = costForDuration(ratePerHour, estimatedSeconds);
   const milestones = milestonesForTimeline(estimatedTotalCost);
   const isOvertime = elapsedSeconds > estimatedSeconds;
+  const currentAmount = costForDuration(ratePerHour, elapsedSeconds);
+
+  // "Sneak peek": den kommende milepælen tegnes uskarp og skjerpes gradvis
+  // inn jo nærmere flammen kommer - avslører akkurat nok til å bygge
+  // spenning uten å spoile poenget for tidlig.
+  const nextMilestone = showNextTeaser ? nextUpcomingMilestone(currentAmount) : null;
+  const remainingToNext = nextMilestone ? Math.max(0, nextMilestone.amount - currentAmount) : 0;
+  const revealWindow = nextMilestone ? Math.max(150, nextMilestone.amount * 0.18) : 1;
+  const revealProgress = nextMilestone
+    ? Math.min(1, Math.max(0, 1 - remainingToNext / revealWindow))
+    : 0;
+  const teaserBlurPx = (1 - revealProgress) * 6;
+  const teaserAlmostThere = revealProgress > 0.85;
 
   const flamePct = timeToFraction(elapsedSeconds, estimatedSeconds) * 100;
 
@@ -75,6 +91,37 @@ export default function Timeline({
 
   return (
     <div className="w-full select-none">
+      {nextMilestone && (
+        <div
+          className={`mb-3 flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 transition-colors duration-500 ${
+            teaserAlmostThere
+              ? "animate-pulse border-ember/50 bg-ember/[0.09]"
+              : "border-ember/20 bg-ember/[0.04]"
+          }`}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted">
+              Neste opp
+            </span>
+            <span
+              className="shrink-0 text-lg leading-none transition-[filter] duration-500"
+              style={{ filter: `blur(${teaserBlurPx}px)` }}
+            >
+              {nextMilestone.emoji}
+            </span>
+            <span
+              className="truncate text-xs text-muted transition-[filter] duration-500"
+              style={{ filter: `blur(${teaserBlurPx}px)` }}
+            >
+              {nextMilestone.text}
+            </span>
+          </div>
+          <span className="tabular shrink-0 text-xs font-bold text-amber">
+            {remainingToNext > 0 ? `${formatKr(remainingToNext)} kr igjen` : "nå!"}
+          </span>
+        </div>
+      )}
+
       <div className="relative h-14 sm:h-16">
         {/* Spor */}
         <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full overflow-hidden bg-ash">

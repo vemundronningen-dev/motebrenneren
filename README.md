@@ -160,6 +160,19 @@ ikke noe i denne arkitekturen som er i veien for det.
   til 5 000 kr. Vises som en løpende prosentandel på live-skjermen
   (`src/lib/caseValueComparison.ts`), med en 🚩-dom hvis møtet ender
   opp med å koste mer enn saken selv er verdt.
+- **Helsesjekk** (`GET /api/health`): enkel diagnose-endepunkt for å
+  feilsøke `DATABASE_URL`/tilkobling uten å måtte reprodusere hele
+  del-møte-flyten - skiller mellom "ikke satt" og "satt, men databasen
+  svarer ikke", uten å lekke selve connection-strengen
+  (`src/app/api/health/route.ts`).
+- **Flere og catchier milepæler + "neste opp"-teaser**: milepæl-listen
+  (`src/lib/milestones.ts`) er tett i det vanlige møte-sjiktet
+  (100–20 000 kr) med gjenkjennelige norske referanser, og strekker seg
+  opp til 2 millioner. På live-skjermen vises i tillegg en uskarp
+  "sneak peek" av neste milepæl som gradvis skjerpes inn jo nærmere
+  flammen kommer (`showNextTeaser` i `src/components/Timeline.tsx`) -
+  bygger spenning uten å spoile poenget for tidlig. Vises kun på et
+  faktisk pågående møte, ikke på en frosset oppsummering.
 
 ## Deploy til Vercel
 
