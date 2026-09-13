@@ -1,14 +1,20 @@
+// Rent ASCII (ingen æøå) med hensikt: en slug havner rått i URL-stien
+// (/m/<slug>), og en ikke-ASCII bokstav der har vist seg å kunne 404 i
+// praksis avhengig av hvordan lenken navigeres til (adressefelt,
+// nettleserhistorikk, deling via Teams/Slack) - trolig et encoding-avvik
+// et sted i den kjeden. ASCII er alltid trygt, så vi transkriberer heller
+// æ/ø/å bort her enn å risikere at delte lenker feiler tilfeldig.
 const ADJECTIVES = [
   "gul",
-  "rød",
-  "blå",
-  "grønn",
+  "rod",
+  "bla",
+  "gronn",
   "sur",
   "sen",
-  "trøtt",
+  "trott",
   "rask",
   "stille",
-  "høy",
+  "hoy",
   "lav",
   "gammel",
   "ny",
@@ -16,8 +22,8 @@ const ADJECTIVES = [
   "glad",
   "kald",
   "varm",
-  "tørr",
-  "våt",
+  "torr",
+  "vat",
   "sliten",
   "skeptisk",
   "ivrig",
@@ -29,12 +35,12 @@ const ADJECTIVES = [
 const NOUNS = [
   "elg",
   "laks",
-  "ørn",
+  "orn",
   "rev",
-  "bjørn",
+  "bjorn",
   "ulv",
   "hare",
-  "måke",
+  "make",
   "torsk",
   "geit",
   "sau",
@@ -46,7 +52,7 @@ const NOUNS = [
   "agenda",
   "kalender",
   "epost",
-  "møterom",
+  "moterom",
 ];
 
 /** "gul-elg-42" – kort og delbar. */
