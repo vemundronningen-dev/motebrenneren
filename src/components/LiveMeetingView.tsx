@@ -134,6 +134,7 @@ export default function LiveMeetingView({
           elapsedSeconds={elapsed}
           estimatedSeconds={meeting.estimated_seconds}
           ratePerHour={meeting.rate_per_hour}
+          participants={meeting.participants}
           onMilestoneReached={(m) => push(`${m.emoji} ${m.text}`)}
           showNextTeaser
         />

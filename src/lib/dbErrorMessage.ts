@@ -27,7 +27,7 @@ export function describeDbError(err: unknown): string {
     }
     if (err.code === "42703") {
       const column = err.column ? ` ("${err.column}")` : "";
-      return `Databasen mangler en kolonne${column} den trenger. Har du kjørt alle migrasjonsfilene i db/migrations/ (0001, 0002, 0003) mot databasen din, i rekkefølge?`;
+      return `Databasen mangler en kolonne${column} den trenger. Har du kjørt alle migrasjonsfilene i db/migrations/ (0001, 0002, 0003, 0004) mot databasen din, i rekkefølge?`;
     }
     return `Databasefeil: ${err.message}`;
   }

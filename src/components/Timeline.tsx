@@ -25,33 +25,44 @@ export default function Timeline({
   elapsedSeconds,
   estimatedSeconds,
   ratePerHour,
+  participants,
   onMilestoneReached,
   showNextTeaser,
 }: {
   elapsedSeconds: number;
   estimatedSeconds: number;
   ratePerHour: number;
+  /** Antall deltakere - avgjør tersklene for gruppeskalerte milepæler (pizza, kaffe, treningskort m.m). */
+  participants: number;
   onMilestoneReached?: (m: Milestone) => void;
   /** Vis "neste opp"-teaseren - kun for et faktisk pågående møte, ikke en frosset oppsummering. */
   showNextTeaser?: boolean;
 }) {
   const rps = ratePerSecond(ratePerHour);
   const estimatedTotalCost = costForDuration(ratePerHour, estimatedSeconds);
-  const milestones = milestonesForTimeline(estimatedTotalCost);
+  const milestones = milestonesForTimeline(estimatedTotalCost, participants);
   const isOvertime = elapsedSeconds > estimatedSeconds;
   const currentAmount = costForDuration(ratePerHour, elapsedSeconds);
 
   // "Sneak peek": den kommende milepælen tegnes uskarp og skjerpes gradvis
   // inn jo nærmere flammen kommer - avslører akkurat nok til å bygge
-  // spenning uten å spoile poenget for tidlig.
-  const nextMilestone = showNextTeaser ? nextUpcomingMilestone(currentAmount) : null;
+  // spenning uten å spoile poenget for tidlig. Jo nærmere 0 kr igjen, jo
+  // skarpere, varmere og mer pulserende blir den - selve nedtellingen skal
+  // føles som en opptrapping, ikke et binært av/på.
+  const nextMilestone = showNextTeaser ? nextUpcomingMilestone(currentAmount, participants) : null;
   const remainingToNext = nextMilestone ? Math.max(0, nextMilestone.amount - currentAmount) : 0;
   const revealWindow = nextMilestone ? Math.max(150, nextMilestone.amount * 0.18) : 1;
   const revealProgress = nextMilestone
     ? Math.min(1, Math.max(0, 1 - remainingToNext / revealWindow))
     : 0;
-  const teaserBlurPx = (1 - revealProgress) * 6;
+  // Ease-in slik at det meste av skjerpingen skjer helt på tampen - de
+  // siste kronene skal føles som et crescendo.
+  const revealEased = revealProgress ** 2;
+  const teaserBlurPx = (1 - revealEased) * 7;
+  const teaserScale = 1 + revealEased * 0.05;
+  const teaserGlow = 0.55 * revealEased;
   const teaserAlmostThere = revealProgress > 0.85;
+  const teaserPulseDuration = 1.6 - revealEased * 1.1;
 
   const flamePct = timeToFraction(elapsedSeconds, estimatedSeconds) * 100;
 
@@ -93,32 +104,50 @@ export default function Timeline({
     <div className="w-full select-none">
       {nextMilestone && (
         <div
-          className={`mb-3 flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 transition-colors duration-500 ${
-            teaserAlmostThere
-              ? "animate-pulse border-ember/50 bg-ember/[0.09]"
-              : "border-ember/20 bg-ember/[0.04]"
+          className={`relative mb-3 overflow-hidden rounded-xl border px-4 py-2.5 transition-[transform,background-color,border-color,box-shadow] duration-300 ${
+            teaserAlmostThere ? "animate-pulse border-ember/60" : "border-ember/20"
           }`}
+          style={{
+            backgroundColor: `rgba(232, 120, 58, ${0.04 + teaserGlow * 0.14})`,
+            transform: `scale(${teaserScale})`,
+            boxShadow: teaserGlow > 0.05 ? `0 0 ${teaserGlow * 22}px rgba(232, 120, 58, ${teaserGlow * 0.5})` : "none",
+            animationDuration: teaserAlmostThere ? `${teaserPulseDuration}s` : undefined,
+          }}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted">
-              Neste opp
-            </span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Neste opp
+              </span>
+              <span
+                className="shrink-0 text-lg leading-none transition-[filter] duration-300"
+                style={{ filter: `blur(${teaserBlurPx}px)` }}
+              >
+                {nextMilestone.emoji}
+              </span>
+              <span
+                className="truncate text-xs transition-[filter,color] duration-300"
+                style={{
+                  filter: `blur(${teaserBlurPx}px)`,
+                  color: teaserAlmostThere ? "var(--color-amber)" : "var(--color-muted)",
+                }}
+              >
+                {nextMilestone.text}
+              </span>
+            </div>
             <span
-              className="shrink-0 text-lg leading-none transition-[filter] duration-500"
-              style={{ filter: `blur(${teaserBlurPx}px)` }}
+              className="tabular shrink-0 text-xs font-bold text-amber"
+              style={{ transform: `scale(${1 + teaserGlow * 0.15})` }}
             >
-              {nextMilestone.emoji}
-            </span>
-            <span
-              className="truncate text-xs text-muted transition-[filter] duration-500"
-              style={{ filter: `blur(${teaserBlurPx}px)` }}
-            >
-              {nextMilestone.text}
+              {remainingToNext > 0 ? `${formatKr(remainingToNext)} kr igjen` : "nå!"}
             </span>
           </div>
-          <span className="tabular shrink-0 text-xs font-bold text-amber">
-            {remainingToNext > 0 ? `${formatKr(remainingToNext)} kr igjen` : "nå!"}
-          </span>
+          <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-ember/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-ember to-amber transition-[width] duration-300"
+              style={{ width: `${revealEased * 100}%` }}
+            />
+          </div>
         </div>
       )}
 

@@ -147,6 +147,7 @@ export default function SummaryView({ meeting }: { meeting: PublicMeeting }) {
           elapsedSeconds={duration}
           estimatedSeconds={meeting.estimated_seconds}
           ratePerHour={meeting.rate_per_hour}
+          participants={meeting.participants}
         />
       </div>
 
