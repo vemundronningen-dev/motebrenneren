@@ -17,8 +17,11 @@ export async function getNationalStats(): Promise<NationalStats> {
       select
         coalesce(sum(amount), 0)::float8 as total_sum,
         count(*)::int as total_meetings,
+        -- "I dag" skal følge norsk kalenderdag, ikke UTC (Neon sin
+        -- serverklokke) - ellers hopper "møter i dag" feil time på
+        -- kvelden/natta sett fra Norge.
         count(*) filter (
-          where created_at >= date_trunc('day', now())
+          where created_at >= date_trunc('day', now() at time zone 'Europe/Oslo') at time zone 'Europe/Oslo'
         )::int as meetings_today,
         coalesce(sum(amount) filter (
           where created_at >= now() - interval '24 hours'

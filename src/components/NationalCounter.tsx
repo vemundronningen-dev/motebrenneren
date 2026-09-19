@@ -47,7 +47,11 @@ export default function NationalCounter({
       const b = baselineRef.current;
       if (b) {
         const elapsed = (Date.now() - b.atMs) / 1000;
-        setDisplayed(b.total + b.ratePerSecond * elapsed);
+        // totalSum kan aldri reelt gå ned (burns settes kun inn, aldri
+        // slettes) - clampes mot forrige viste verdi som en sikkerhet mot
+        // at en anslått rate skulle vise et tall som senere korrigeres
+        // nedover og se ut som telleren "teller nedover".
+        setDisplayed((prev) => Math.max(prev, b.total + b.ratePerSecond * elapsed));
       }
       raf = requestAnimationFrame(tick);
     };
