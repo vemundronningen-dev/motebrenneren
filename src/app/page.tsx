@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NationalCounter from "@/components/NationalCounter";
+import InviteBotCard from "@/components/InviteBotCard";
 import { SponsorBannerCard } from "@/components/SponsorBanner";
 import { getNationalStats } from "@/lib/stats";
 
@@ -24,6 +25,8 @@ export default async function HomePage() {
         <p className="text-xs text-muted text-center max-w-sm">
           Anonymt. Vi lagrer bare tallene, aldri hvem eller hva.
         </p>
+
+        <InviteBotCard />
 
         <section className="w-full mt-8 rounded-2xl border border-line bg-background-raised p-6 text-sm text-muted leading-relaxed">
           <h2 className="text-foreground font-semibold mb-2">

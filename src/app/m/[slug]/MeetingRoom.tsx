@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import LiveMeetingView from "@/components/LiveMeetingView";
 import SummaryView from "@/components/SummaryView";
 import ShareButton from "@/components/ShareButton";
-import { getHostToken } from "@/lib/hostToken";
+import { getHostToken, saveHostToken } from "@/lib/hostToken";
 import { useLiveMeeting } from "@/lib/useLiveMeeting";
 import { costForDuration } from "@/lib/calc";
 import { formatKr } from "@/lib/format";
@@ -31,6 +31,15 @@ export default function MeetingRoom({
   const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Vertslenken fra bekreftelses-e-posten (møteboten): lagre tokenet og
+    // fjern det fra adressefeltet så det ikke deles videre ved et uhell.
+    const url = new URL(window.location.href);
+    const fromLink = url.searchParams.get("vert");
+    if (fromLink) {
+      saveHostToken(slug, fromLink);
+      url.searchParams.delete("vert");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    }
     const token = getHostToken(slug);
     hostTokenRef.current = token;
     setIsHost(token != null);

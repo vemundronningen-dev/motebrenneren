@@ -69,6 +69,27 @@ export default function PersonvernPage() {
           </section>
 
           <section>
+            <h2 className="font-semibold text-lg mb-1">Møteboten (invitasjoner)</h2>
+            <p className="text-muted">
+              Når du legger til Møtebrenneren i en møteinvitasjon, leser vi
+              invitasjonen for å finne tidspunkt, varighet, antall inviterte og
+              lenken til nettmøtet. Navn, e-postadresser, agenda og
+              møtetittelen lagres ikke – bortsett fra at en kjent møtetype
+              (f.eks. &quot;Statusmøte&quot;) kan hentes fra emnefeltet.
+              Møtelenken lagres bare så lenge boten er booket, og slettes når
+              møtet (eller serien) er ferdig. Vi svarer avsenderen med en
+              bekreftelse, men tar ikke vare på adressen.
+            </p>
+            <p className="mt-2 text-muted">
+              Selve boten drives av underleverandøren Recall.ai, i deres
+              EU-region. Boten <strong>tar ikke opp</strong> lyd, bilde,
+              tekst eller transkripsjon – den viser kun et kamerabilde med
+              møtekostnaden, og skriver én melding i møtechatten om at den er
+              med.
+            </p>
+          </section>
+
+          <section>
             <h2 className="font-semibold text-lg mb-1">Kontakt</h2>
             <p className="text-muted">
               Spørsmål om personvern? Møtebrenneren er et humorprosjekt uten

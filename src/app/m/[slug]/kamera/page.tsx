@@ -12,12 +12,15 @@ export const metadata: Metadata = {
 
 export default async function CameraPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ bot?: string }>;
 }) {
   const { slug } = await params;
+  const { bot } = await searchParams;
   const meeting = await getMeetingBySlug(slug);
   if (!meeting) notFound();
 
-  return <CameraView slug={slug} initialMeeting={meeting} />;
+  return <CameraView slug={slug} initialMeeting={meeting} botSignature={bot ?? null} />;
 }

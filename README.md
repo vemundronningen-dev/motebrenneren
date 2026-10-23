@@ -14,6 +14,7 @@ Postgres) og Tailwind CSS.
 - [Database-oppsett (Neon)](#database-oppsett-neon)
 - [Miljøvariabler](#miljøvariabler)
 - [Arkitektur i korte trekk](#arkitektur-i-korte-trekk)
+- [Møteboten (inviter gronntorsk@)](#møteboten-inviter-gronntorsk)
 - [Deploy til Vercel](#deploy-til-vercel)
 
 ## Kom i gang lokalt
@@ -42,6 +43,7 @@ npm run dev
    psql "$DATABASE_URL" -f db/migrations/0002_meeting_label.sql
    psql "$DATABASE_URL" -f db/migrations/0003_final_duration.sql
    psql "$DATABASE_URL" -f db/migrations/0004_case_value.sql
+   psql "$DATABASE_URL" -f db/migrations/0005_bot_invites.sql
    ```
 
    Har du ikke `psql` installert kan du i stedet lime hele innholdet i
@@ -115,6 +117,11 @@ ikke noe i denne arkitekturen som er i veien for det.
 | Variabel | Hvor den brukes | Offentlig? |
 | --- | --- | --- |
 | `DATABASE_URL` | Kun server (`src/lib/db/client.ts`) | **Nei – aldri i nettleseren** |
+| `NEXT_PUBLIC_BOT_EMAIL` | Adressen som vises for "inviter boten" | Ja |
+| `RECALL_API_KEY`, `RECALL_REGION` | Møteboten (`src/lib/recall.ts`) | Nei |
+| `RECALL_WEBHOOK_SECRET` | Verifiserer webhooks fra Recall (`whsec_…`) | Nei |
+| `INBOUND_EMAIL_TOKEN` | Hemmelig token i inbound-e-post-webhooken | Nei |
+| `POSTMARK_SERVER_TOKEN`, `BOT_EMAIL_FROM` | Valgfrie bekreftelses-e-poster | Nei |
 
 ## Arkitektur i korte trekk
 
@@ -183,6 +190,54 @@ ikke noe i denne arkitekturen som er i veien for det.
   for sluttbrukere ligger på `/teams`. Ingen DNS, Azure-app eller
   Teams-administrator trengs. Kameravisningen sender ikke heartbeat, så
   den teller ikke som en av "kollegene som ser på".
+
+## Møteboten (inviter gronntorsk@)
+
+Den enkleste måten å få Møtebrenneren inn i et Teams-møte på: legg til
+`gronntorsk@motebrenneren.no` i møteinvitasjonen. Ingen app å installere
+(ofte blokkert i konsern), ingen OBS.
+
+**Flyt:** invitasjonen sendes som e-post til adressen → Postmark Inbound
+poster den til `POST /api/inbound-email?token=…` → `src/lib/ics.ts` leser
+tidspunkt, varighet, antall inviterte og møtelenke (Teams/Zoom/Meet/Webex)
+→ det opprettes et møterom og en [Recall.ai](https://recall.ai)-bot bookes
+(`src/lib/botInvites.ts`, `src/lib/recall.ts`) med kameravisningen
+(`/m/[slug]/kamera`) som video og **uten opptak** (`recording_config: null`).
+Recall varsler `POST /api/recall/webhook` (Svix-signert): når boten slippes
+inn tennes lunta (aldri før planlagt start), og når alle har gått stoppes
+den og beløpet telles mot Norge. Gjentakende møter (daglig/ukentlig, med
+avlyste forekomster) bookes automatisk på nytt; avlysning eller fjerning
+av adressen avbestiller boten. Kameraet tenner også lunta selv via en
+signert URL hvis webhooken skulle utebli (`/api/meetings/[slug]/bot-start`).
+Status for oppsettet: `GET /api/health`.
+
+**Oppsett (én gang):**
+
+1. **Database:** kjør `db/migrations/0005_bot_invites.sql`.
+2. **Recall.ai:** opprett konto i EU-regionen (`eu-central-1`), lag en
+   API-nøkkel. Under Webhooks: legg til
+   `https://motebrenneren.no/api/recall/webhook` med hendelsene
+   `bot.in_call_not_recording`, `bot.in_call_recording`, `bot.call_ended`,
+   `bot.done` og `bot.fatal`. Kopier "verification secret" (`whsec_…`).
+3. **Postmark:** opprett en server. Under *Default Inbound Stream →
+   Settings*: sett webhook-URL til
+   `https://motebrenneren.no/api/inbound-email?token=<INBOUND_EMAIL_TOKEN>`,
+   huk av **Include raw email content in JSON payload**, og legg inn
+   `motebrenneren.no` som *Inbound domain*.
+4. **DNS (zone editor):** MX-post for domenet → `inbound.postmarkapp.com`
+   (prioritet 10). For bekreftelses-e-post: legg i tillegg inn DKIM
+   (TXT) og Return-Path (CNAME `pm-bounces` → `pm.mtasv.net`) som
+   Postmark viser under *Sender Signatures*. ⚠️ Har domenet allerede
+   e-post (f.eks. `post@motebrenneren.no`), vil MX-endringen sende all
+   e-post til Postmark – bruk da et underdomene som `bot.motebrenneren.no`
+   og sett `NEXT_PUBLIC_BOT_EMAIL` tilsvarende.
+5. **Vercel:** legg inn miljøvariablene over og redeploy.
+
+**Merk:** boten blir med som anonym gjest. Organisasjoner som har slått
+av "Anonymous users can join a meeting" i Teams må åpne for det – `/teams`
+har en ferdig melding brukeren kan sende til IT. Hver bot-time faktureres
+av Recall, så `BOT_DAILY_LIMIT` (standard 300 nye invitasjoner per døgn)
+begrenser misbruk.
 
 ## Deploy til Vercel
 

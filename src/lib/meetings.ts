@@ -2,7 +2,7 @@ import "server-only";
 import { NeonDbError } from "@neondatabase/serverless";
 import { sql } from "./db/client";
 import { generateSlug } from "./slug";
-import { insertBurn } from "./burns";
+import { insertBurn, BurnValidationError } from "./burns";
 import { costForDuration } from "./calc";
 import { sanitizeMeetingLabel, sanitizeCaseValue } from "./meetingTypes";
 import type { MeetingStatus, PublicMeeting } from "./types";
@@ -318,4 +318,50 @@ export async function performMeetingAction(
   }
 
   return toPublic(row);
+}
+
+// ---------------------------------------------------------------------------
+// Brukes av møteboten (webhook fra Recall), som ikke har noen vert-token i
+// en nettleser. Kalles kun fra signaturverifiserte server-ruter.
+// ---------------------------------------------------------------------------
+
+/**
+ * Tenner lunta når boten slippes inn i møtet - men aldri før planlagt
+ * start: slippes den inn tidlig, settes started_at til starttidspunktet
+ * (telleren står på 0 og kameraet viser nedtelling til da). Starter folk
+ * for sent, teller det fra planlagt start - ventetid koster også.
+ */
+export async function startMeetingFromBot(slug: string, scheduledStart: Date): Promise<void> {
+  await sql`
+    update live_meetings
+    set status = 'running',
+        started_at = greatest(now(), ${scheduledStart.toISOString()}::timestamptz)
+    where slug = ${slug} and status = 'lobby'
+  `;
+}
+
+/** Stopper (og teller mot Norge) når boten forlater møtet. Trygg å kalle flere ganger. */
+export async function stopMeetingFromBot(slug: string): Promise<void> {
+  const rows = await sql<Pick<Row, "status" | "host_token">>`
+    select status, host_token from live_meetings where slug = ${slug} limit 1
+  `;
+  const row = rows[0];
+  if (!row || (row.status !== "running" && row.status !== "paused")) return;
+  try {
+    await performMeetingAction(slug, row.host_token, "stop");
+  } catch (err) {
+    // Møtet rakk aldri å starte (boten gikk før planlagt start): da er det
+    // ingenting å telle, og møtet er uansett satt til avsluttet.
+    if (err instanceof BurnValidationError) return;
+    if (err instanceof MeetingError && err.code === "invalid_state") return;
+    throw err;
+  }
+}
+
+/** Vert-tokenet for et møte - kun til lenken i bekreftelses-e-posten til den som inviterte boten. */
+export async function getHostTokenForSlug(slug: string): Promise<string | null> {
+  const rows = await sql<{ host_token: string }>`
+    select host_token from live_meetings where slug = ${slug} limit 1
+  `;
+  return rows[0]?.host_token ?? null;
 }

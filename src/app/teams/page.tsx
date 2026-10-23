@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import InviteBotCard from "@/components/InviteBotCard";
+import { BOT_EMAIL } from "@/lib/botEmail";
 
 export const metadata: Metadata = {
   title: "Møtebrenneren i Teams",
   description:
-    "Få Møtebrenneren inn i Teams-møtet som en egen deltaker, med et kamera som viser kostnad, løpetid og milepæler live.",
+    "Legg til Møtebrenneren i møteinvitasjonen, så blir den med i Teams-møtet med kostnaden live på kameraet. Ingen app, ingen installasjon, ingen opptak.",
 };
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-4">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember text-sm font-bold text-[#1a0d05]">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ember text-lg font-bold text-[#1a0d05]">
         {n}
       </span>
-      <div className="min-w-0 pt-1">
-        <h3 className="font-semibold text-foreground">{title}</h3>
-        <div className="mt-1 flex flex-col gap-2 text-muted">{children}</div>
+      <div className="min-w-0 pt-1.5">
+        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        <div className="mt-1 flex flex-col gap-2 text-base text-muted">{children}</div>
       </div>
     </li>
   );
@@ -29,142 +31,138 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
+function Faq({ q, children }: { q: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="font-semibold text-foreground">{q}</h3>
+      <div className="mt-1 text-muted">{children}</div>
+    </div>
+  );
+}
+
+const IT_MESSAGE = `Hei!
+
+Vi vil bruke Møtebrenneren (motebrenneren.no) i Teams-møtene våre. Den blir med som en ekstern gjest som viser møtekostnaden på kameraet – den tar ikke opp lyd, bilde eller tekst.
+
+For at den skal komme inn, må anonyme deltakere kunne bli med i møter:
+Teams admin center → Meetings → Meeting settings og Meeting policies → «Anonymous users can join a meeting» = On.
+
+Takk!`;
+
 export default function TeamsGuidePage() {
   return (
     <main className="flex-1 px-4 py-16">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-3xl font-bold">Møtebrenneren som deltaker i Teams</h1>
-        <p className="mt-2 text-muted">
-          Møtebrenneren kan bli med i Teams-møtet som en egen deltaker, med et
-          &quot;kamera&quot; som alltid står på og viser hva møtet koster,
-          hvor lenge det har vart, og hver milepæl som brennes – live, for
-          alle.
+        <h1 className="text-3xl sm:text-4xl font-bold">Møtebrenneren i møtet ditt</h1>
+        <p className="mt-3 text-lg text-muted">
+          Du inviterer Møtebrenneren som om den var en kollega. Den blir med i møtet og viser hva det
+          koster, live på kameraet. Ingen app, ingen installasjon, ingen opptak.
         </p>
 
-        <div className="mt-6 rounded-2xl border border-ember/30 bg-ember/[0.06] p-4 text-sm text-muted">
-          <p>
-            <span className="font-semibold text-foreground">Slik virker det:</span>{" "}
-            hvert delte møte har en egen kameravisning (lenke som slutter på{" "}
-            <code className="text-foreground">/kamera</code>). Gratisprogrammet
-            OBS Studio gjør den om til et webkamera, og så blir du med i
-            Teams-møtet en ekstra gang med det kameraet – som deltakeren
-            &quot;🔥 Møtebrenneren&quot;.
-          </p>
+        <div className="mt-8">
+          <InviteBotCard showGuideLink={false} />
         </div>
 
-        <h2 className="mt-10 text-xl font-bold">Engangsoppsett (ca. 10 minutter)</h2>
-        <ol className="mt-4 flex flex-col gap-6 text-sm leading-relaxed">
-          <Step n={1} title="Installer OBS Studio">
+        <h2 className="mt-12 text-2xl font-bold">Tre steg – det er alt</h2>
+        <ol className="mt-6 flex flex-col gap-8 leading-relaxed">
+          <Step n={1} title="Legg til adressen i invitasjonen">
             <p>
-              Last ned gratis fra{" "}
+              Åpne møtet i Outlook- eller Teams-kalenderen. Skriv <strong>{BOT_EMAIL}</strong> der du
+              legger til deltakere – akkurat som en kollega. Trykk <Kbd>Send</Kbd> (eller{" "}
+              <Kbd>Send oppdatering</Kbd>).
+            </p>
+          </Step>
+          <Step n={2} title="Få bekreftelse">
+            <p>
+              Innen et minutt får du en e-post: «🔥 Møtebrenneren kommer». Der står prognosen, og en
+              lenke hvor du kan følge med – eller pause og stoppe telleren selv.
+            </p>
+          </Step>
+          <Step n={3} title="Slipp den inn når møtet starter">
+            <p>
+              «🔥 Møtebrenneren» dukker opp i lobbyen. Trykk <Kbd>Slipp inn</Kbd>. Resten skjer av seg
+              selv: telleren starter ved møtestart, viser hver milepæl som brennes, og stopper når alle
+              har gått.
+            </p>
+          </Step>
+        </ol>
+
+        <h2 className="mt-14 text-2xl font-bold">Spørsmål</h2>
+        <div className="mt-5 flex flex-col gap-6 text-base leading-relaxed">
+          <Faq q="Tar den opp møtet?">
+            Nei. Den tar ikke opp lyd, bilde eller tekst, og lagrer verken navn, e-postadresser eller
+            hva møtet handler om. Den <em>viser</em> bare et kamerabilde med kostnaden.{" "}
+            <Link href="/personvern" className="underline">
+              Les mer om personvern
+            </Link>
+            .
+          </Faq>
+          <Faq q="Hvordan vet den hva møtet koster?">
+            Den teller hvor mange som er invitert (møterom og den selv regnes ikke med), og regner 1 000
+            kr i timen per person – et nøkternt snitt inkludert sosiale kostnader. Lengden henter den fra
+            invitasjonen.
+          </Faq>
+          <Faq q="Faste møter hver uke?">
+            Legg den til i serien én gang, så kommer den hver gang. Avlyser du én forekomst, hopper den
+            over den.
+          </Faq>
+          <Faq q="Hvordan avbestiller jeg?">
+            Fjern adressen fra invitasjonen (eller avlys møtet) og send oppdateringen. Da kommer den ikke.
+          </Faq>
+          <Faq q="Den kom aldri inn i møtet">
+            <p>
+              Noen bedrifter har stengt for eksterne gjester i Teams-møter. Da må IT åpne for det. Du kan
+              sende dem denne meldingen:
+            </p>
+            <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-line bg-background-raised p-4 text-sm text-foreground">
+              {IT_MESSAGE}
+            </pre>
+            <p className="mt-2">
               <a
-                href="https://obsproject.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-foreground underline"
+                href={`mailto:?subject=${encodeURIComponent("Kan vi slippe Møtebrenneren inn i Teams-møter?")}&body=${encodeURIComponent(IT_MESSAGE)}`}
+                className="font-semibold text-foreground underline"
               >
-                obsproject.com
-              </a>{" "}
-              (Windows eller Mac) og installer som et vanlig program.
+                ✉️ Åpne som e-post til IT
+              </a>
             </p>
-          </Step>
-          <Step n={2} title="Sett bildet til 1280 × 720">
-            <p>
-              Åpne OBS. Dukker det opp en veiviser, velg{" "}
-              <Kbd>Optimaliser kun for virtuelt kamera</Kbd>. Ellers: gå til{" "}
-              <Kbd>Innstillinger</Kbd> → <Kbd>Video</Kbd> og sett både
-              grunnoppløsning og utdataoppløsning til <Kbd>1280x720</Kbd>.
-            </p>
-          </Step>
-          <Step n={3} title="Legg til Møtebrenneren som kilde">
-            <p>
-              Nederst under <Kbd>Kilder</Kbd>: trykk <Kbd>+</Kbd> →{" "}
-              <Kbd>Nettleser</Kbd>, og kall den &quot;Møtebrenneren&quot;. Sett
-              bredde <Kbd>1280</Kbd> og høyde <Kbd>720</Kbd>. URL-feltet fyller du
-              inn i steg 6 – lim inn hva som helst for nå.
-            </p>
-          </Step>
-          <Step n={4} title="Start det virtuelle kameraet">
-            <p>
-              Trykk <Kbd>Start virtuelt kamera</Kbd> nederst til høyre i OBS. På
-              Mac må du godkjenne en systemutvidelse første gang (krever macOS 13
-              eller nyere).
-            </p>
-          </Step>
-        </ol>
-
-        <h2 className="mt-10 text-xl font-bold">Hver gang du har møte</h2>
-        <ol className="mt-4 flex flex-col gap-6 text-sm leading-relaxed">
-          <Step n={5} title="Del møtet i Møtebrenneren">
-            <p>
-              Sett opp møtet på{" "}
-              <Link href="/start" className="text-foreground underline">
-                motebrenneren.no/start
-              </Link>{" "}
-              og trykk <Kbd>Del møtet med kollegaer</Kbd>. I delingsboksen trykker
-              du <Kbd>📹 Åpne Teams-kameravisning</Kbd> og kopierer adressen fra
-              adressefeltet.
-            </p>
-          </Step>
-          <Step n={6} title="Lim lenken inn i OBS">
-            <p>
-              Dobbeltklikk på &quot;Møtebrenneren&quot;-kilden i OBS og lim inn
-              kamera-lenken i URL-feltet. Nå ser du Møtebrenneren i
-              forhåndsvisningen.
-            </p>
-          </Step>
-          <Step n={7} title="Bli med i Teams-møtet som Møtebrenneren">
-            <p>
-              Åpne Teams-møtelenken i <strong>Chrome eller Edge</strong> (ikke i
-              Teams-appen) og velg <Kbd>Fortsett i denne nettleseren</Kbd>. Skriv
-              navnet <Kbd>🔥 Møtebrenneren</Kbd>, velg{" "}
-              <Kbd>OBS Virtual Camera</Kbd> som kamera, og <strong>slå av mikrofon
-              og høyttaler</strong> (ellers får dere ekko). Trykk{" "}
-              <Kbd>Bli med nå</Kbd>.
-            </p>
-            <p>
-              Selv blir du med som vanlig i Teams-appen. Da er dere to deltakere fra
-              samme maskin – helt normalt.
-            </p>
-          </Step>
-          <Step n={8} title="Fest Møtebrenneren på skjermen">
-            <p>
-              I Teams: høyreklikk Møtebrenneren-ruta → <Kbd>Fest</Kbd> (bare for
-              deg) eller <Kbd>Sett i søkelyset for alle</Kbd> (krever at du er
-              arrangør) – så ser alle tallet stort.
-            </p>
-          </Step>
-        </ol>
-
-        <h2 className="mt-10 text-xl font-bold">Hvis noe ikke virker</h2>
-        <div className="mt-4 flex flex-col gap-4 text-sm leading-relaxed text-muted">
-          <p>
-            <span className="font-semibold text-foreground">
-              Organisasjonen tillater ikke gjester:
-            </span>{" "}
-            bruk en annen Teams-konto eller en annen PC/Mac for Møtebrenneren –
-            eller velg <Kbd>OBS Virtual Camera</Kbd> som ditt eget kamera i Teams
-            (da viser ruta di Møtebrenneren i stedet for deg).
-          </p>
-          <p>
-            <span className="font-semibold text-foreground">
-              &quot;OBS Virtual Camera&quot; dukker ikke opp:
-            </span>{" "}
-            sjekk at du har trykket <Kbd>Start virtuelt kamera</Kbd> i OBS, og
-            last Teams-siden på nytt.
-          </p>
-          <p>
-            <span className="font-semibold text-foreground">Teksten er speilvendt:</span>{" "}
-            det er bare din egen forhåndsvisning. De andre i møtet ser den riktig
-            vei.
-          </p>
-          <p>
-            <span className="font-semibold text-foreground">Vil ikke installere OBS?</span>{" "}
-            Åpne kameravisningen i et eget nettleservindu og bruk{" "}
-            <Kbd>Del</Kbd> → <Kbd>Vindu</Kbd> i Teams. Det fungerer, men da
-            opptar Møtebrenneren skjermdelingen.
-          </p>
+          </Faq>
+          <Faq q="Virker det med Zoom og Google Meet også?">
+            Ja – Teams, Zoom, Google Meet og Webex. Fremgangsmåten er den samme.
+          </Faq>
         </div>
+
+        <details className="mt-14 rounded-2xl border border-line bg-background-raised p-5 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-base font-semibold text-foreground">
+            Alternativ for teknisk interesserte: eget virtuelt kamera med OBS
+          </summary>
+          <div className="mt-4 flex flex-col gap-3 text-muted">
+            <p>
+              Hvis gjester ikke slipper inn i dine møter, kan du sende kameravisningen inn selv med
+              gratisprogrammet OBS Studio:
+            </p>
+            <ol className="list-decimal pl-5 flex flex-col gap-2">
+              <li>
+                Installer OBS fra{" "}
+                <a href="https://obsproject.com" target="_blank" rel="noopener noreferrer" className="underline">
+                  obsproject.com
+                </a>{" "}
+                og sett video til <Kbd>1280x720</Kbd> under <Kbd>Innstillinger</Kbd> → <Kbd>Video</Kbd>.
+              </li>
+              <li>
+                Del et møte på <Link href="/start" className="underline">motebrenneren.no/start</Link> og
+                trykk <Kbd>📹 Åpne Teams-kameravisning</Kbd>. Kopier adressen.
+              </li>
+              <li>
+                I OBS: <Kbd>Kilder</Kbd> → <Kbd>+</Kbd> → <Kbd>Nettleser</Kbd>, lim inn adressen, bredde
+                1280, høyde 720. Trykk <Kbd>Start virtuelt kamera</Kbd>.
+              </li>
+              <li>
+                I Teams: velg <Kbd>OBS Virtual Camera</Kbd> som kamera – eller bli med en ekstra gang fra
+                Chrome/Edge som «🔥 Møtebrenneren» med lyd av.
+              </li>
+            </ol>
+          </div>
+        </details>
       </div>
     </main>
   );

@@ -33,11 +33,26 @@ const BURST_MS = 5_000;
 export default function CameraView({
   slug,
   initialMeeting,
+  botSignature,
 }: {
   slug: string;
   initialMeeting: PublicMeeting;
+  /** Satt når siden lastes av møteboten (signert lenke fra serveren). */
+  botSignature?: string | null;
 }) {
   const [meeting] = useLiveMeeting(slug, initialMeeting);
+
+  // Boten laster siden når den er i møtet: tenn lunta herfra også, i tilfelle
+  // webhooken fra Recall er forsinket eller feilkonfigurert. Serveren venter
+  // uansett til planlagt start, og gjør ingenting hvis møtet alt er i gang.
+  useEffect(() => {
+    if (!botSignature || initialMeeting.status !== "lobby") return;
+    fetch(`/api/meetings/${slug}/bot-start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sig: botSignature }),
+    }).catch(() => {});
+  }, [slug, botSignature, initialMeeting.status]);
   // null til komponenten er montert i nettleseren: server og klient har
   // ulik Date.now(), og et klokkeslett rendret på serveren gir hydrerings-
   // feil. Et tomt bilde i én frame er usynlig i en kamerastrøm.
@@ -62,6 +77,12 @@ export default function CameraView({
   const elapsed = calcElapsed(meeting, now ?? undefined);
   const amount = meeting.final_amount ?? costForDuration(meeting.rate_per_hour, elapsed);
   const mounted = now != null;
+  // Boten ble sluppet inn før planlagt start: started_at ligger i fremtiden.
+  const startsInSeconds =
+    mounted && meeting.status === "running" && meeting.started_at
+      ? Math.max(0, (new Date(meeting.started_at).getTime() - now) / 1000)
+      : 0;
+  const countingDown = startsInSeconds > 0;
 
   return (
     <div
@@ -77,9 +98,11 @@ export default function CameraView({
         }}
       />
       <div className="relative mx-auto flex h-full w-[82%] flex-col justify-between py-[2.4em]">
-        <Header meeting={meeting} />
-        {meeting.status === "lobby" && <LobbyBody meeting={meeting} />}
-        {mounted && (meeting.status === "running" || meeting.status === "paused") && (
+        <Header meeting={meeting} countingDown={countingDown} />
+        {(meeting.status === "lobby" || countingDown) && (
+          <LobbyBody meeting={meeting} startsInSeconds={countingDown ? startsInSeconds : null} />
+        )}
+        {mounted && !countingDown && (meeting.status === "running" || meeting.status === "paused") && (
           <LiveBody meeting={meeting} elapsed={elapsed} amount={amount} />
         )}
         {mounted && meeting.status === "ended" && (
@@ -93,13 +116,15 @@ export default function CameraView({
   );
 }
 
-function Header({ meeting }: { meeting: PublicMeeting }) {
-  const status = {
-    lobby: { text: "Venter på start", dot: "bg-[#fff4ea]/50", pulse: false },
-    running: { text: "Live", dot: "bg-[#ff3b1f]", pulse: true },
-    paused: { text: "Pause", dot: "bg-[#ffc24d]", pulse: false },
-    ended: { text: "Avsluttet", dot: "bg-[#fff4ea]/50", pulse: false },
-  }[meeting.status];
+function Header({ meeting, countingDown }: { meeting: PublicMeeting; countingDown: boolean }) {
+  const status = countingDown
+    ? { text: "Starter snart", dot: "bg-[#ffc24d]", pulse: true }
+    : {
+        lobby: { text: "Venter på start", dot: "bg-[#fff4ea]/50", pulse: false },
+        running: { text: "Live", dot: "bg-[#ff3b1f]", pulse: true },
+        paused: { text: "Pause", dot: "bg-[#ffc24d]", pulse: false },
+        ended: { text: "Avsluttet", dot: "bg-[#fff4ea]/50", pulse: false },
+      }[meeting.status];
 
   return (
     <div className="flex items-start justify-between gap-[1em]">
@@ -125,10 +150,21 @@ function Header({ meeting }: { meeting: PublicMeeting }) {
   );
 }
 
-function LobbyBody({ meeting }: { meeting: PublicMeeting }) {
+function LobbyBody({
+  meeting,
+  startsInSeconds,
+}: {
+  meeting: PublicMeeting;
+  startsInSeconds: number | null;
+}) {
   const prognosis = costForDuration(meeting.rate_per_hour, meeting.estimated_seconds);
   return (
     <div className="flex flex-col items-center text-center">
+      {startsInSeconds != null && (
+        <div className="tabular mb-[0.8em] rounded-full bg-[#ffc24d] px-[1em] py-[0.25em] text-[1.4em] font-black text-[#140d08]">
+          Lunta tennes om {formatClock(startsInSeconds)}
+        </div>
+      )}
       <div className="text-[1.5em] font-semibold text-[#fff4ea]/70">Prognose for dette møtet</div>
       <div className="tabular mt-[0.1em] text-[5.2em] font-black leading-none text-[#ff6a1f]">
         {formatKr(prognosis)} kr
@@ -138,7 +174,7 @@ function LobbyBody({ meeting }: { meeting: PublicMeeting }) {
         {formatKr(ratePerMinute(meeting.rate_per_hour))} kr/min
       </div>
       <div className="mt-[1.2em] text-[1.3em] font-semibold text-[#fff4ea]/55">
-        Lunta tennes når verten trykker start.
+        Lunta tennes når møtet starter.
       </div>
     </div>
   );
