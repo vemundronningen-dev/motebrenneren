@@ -174,6 +174,16 @@ ikke noe i denne arkitekturen som er i veien for det.
   bygger spenning uten å spoile poenget for tidlig. Vises kun på et
   faktisk pågående møte, ikke på en frosset oppsummering.
 
+- **Teams-kamera** (`/m/[slug]/kamera`): en fullskjerm, mørk 16:9-visning
+  av et delt møte (kostnad, løpetid, fremdrift, sist brente og neste
+  milepæl, og en stor "💥 Brent!"-animasjon hver gang en ny milepæl
+  passeres), laget for å fanges med OBS Studio sin Browser Source og
+  sendes inn i Teams via OBS Virtual Camera - slik at Møtebrenneren kan
+  sitte i møtet som en egen deltaker med kameraet på. Trinnvis oppsett
+  for sluttbrukere ligger på `/teams`. Ingen DNS, Azure-app eller
+  Teams-administrator trengs. Kameravisningen sender ikke heartbeat, så
+  den teller ikke som en av "kollegene som ser på".
+
 ## Deploy til Vercel
 
 1. Push repoet til GitHub.

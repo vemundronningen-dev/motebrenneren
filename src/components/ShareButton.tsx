@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { saveHostToken } from "@/lib/hostToken";
 
 interface Props {
@@ -137,6 +138,19 @@ export default function ShareButton({
           >
             Del
           </button>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-ember/20 pt-3 text-sm">
+          <a
+            href={`/m/${slug}/kamera`}
+            target="_blank"
+            rel="noopener"
+            className="font-medium text-foreground underline decoration-ember/50 underline-offset-2 hover:decoration-ember"
+          >
+            📹 Åpne Teams-kameravisning
+          </a>
+          <Link href="/teams" className="text-xs text-muted underline hover:text-foreground">
+            Slik setter du det opp
+          </Link>
         </div>
       </div>
     );

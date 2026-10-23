@@ -238,3 +238,30 @@ body {
   background: var(--ember);
   color: #fff8ef;
 }
+
+/* Kameravisningen: ny milepæl "smeller" inn, blir stående, og toner ut. */
+@keyframes cam-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  20% {
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.cam-burst {
+  animation: cam-burst 5s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+}

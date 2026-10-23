@@ -5,17 +5,11 @@ import LiveMeetingView from "@/components/LiveMeetingView";
 import SummaryView from "@/components/SummaryView";
 import ShareButton from "@/components/ShareButton";
 import { getHostToken } from "@/lib/hostToken";
+import { useLiveMeeting } from "@/lib/useLiveMeeting";
 import { costForDuration } from "@/lib/calc";
 import { formatKr } from "@/lib/format";
 import type { PublicMeeting } from "@/lib/types";
 
-// Ingen realtime-infrastruktur i denne oppsett (ren Postgres via Neon) -
-// status og seertall hentes derfor med jevn polling i stedet for en push
-// når verten endrer status. Selve kr-telleren er upåvirket av dette: den
-// regnes lokalt 10x/sekund ut fra started_at/paused-feltene (server-tid),
-// så bare statusendringer (start/pause/resume/stopp) og seertallet er
-// avhengig av pollingen - et par sekunders forsinkelse på de er umerkelig.
-const POLL_INTERVAL_MS = 3_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 
 function newSessionId(): string {
@@ -29,7 +23,7 @@ export default function MeetingRoom({
   slug: string;
   initialMeeting: PublicMeeting;
 }) {
-  const [meeting, setMeeting] = useState(initialMeeting);
+  const [meeting, setMeeting] = useLiveMeeting(slug, initialMeeting);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
@@ -42,20 +36,6 @@ export default function MeetingRoom({
     setIsHost(token != null);
     sessionIdRef.current = newSessionId();
   }, [slug]);
-
-  // Poll for fersk status (og seertall) mens møtet ikke er avsluttet.
-  useEffect(() => {
-    if (meeting.status === "ended") return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/meetings/${slug}`, { cache: "no-store" });
-        if (res.ok) setMeeting(await res.json());
-      } catch {
-        // stille - prøver igjen neste runde
-      }
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [slug, meeting.status]);
 
   // Heartbeat for "X kolleger ser på" mens møtet ikke er avsluttet.
   useEffect(() => {

@@ -141,3 +141,21 @@ export function milestonesForTimeline(
 export function nextUpcomingMilestone(amount: number, participantCount: number): Milestone | null {
   return resolveMilestones(participantCount).find((m) => m.amount > amount) ?? null;
 }
+
+/** Den sist passerte milepælen, eller null hvis ingen er nådd ennå. */
+export function lastReachedMilestone(amount: number, participantCount: number): Milestone | null {
+  const reached = milestonesUpTo(amount, participantCount);
+  return reached[reached.length - 1] ?? null;
+}
+
+/**
+ * Hvor langt "neste opp"-teaseren er avslørt (0 = helt uskarp, 1 = helt
+ * skarp). Avsløringen skjer kun i de siste ~18 % før milepælen, og er
+ * kvadrert slik at det meste av skjerpingen skjer helt på tampen.
+ */
+export function teaserReveal(currentAmount: number, next: Milestone): number {
+  const remaining = Math.max(0, next.amount - currentAmount);
+  const window = Math.max(150, next.amount * 0.18);
+  const linear = Math.min(1, Math.max(0, 1 - remaining / window));
+  return linear ** 2;
+}

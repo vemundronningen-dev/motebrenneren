@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatKr, formatMinutes } from "@/lib/format";
-import { milestonesForTimeline, nextUpcomingMilestone, type Milestone } from "@/lib/milestones";
+import {
+  milestonesForTimeline,
+  nextUpcomingMilestone,
+  teaserReveal,
+  type Milestone,
+} from "@/lib/milestones";
 import { ratePerSecond, costForDuration } from "@/lib/calc";
 
 const MAIN_FRACTION = 0.76;
@@ -51,17 +56,11 @@ export default function Timeline({
   // føles som en opptrapping, ikke et binært av/på.
   const nextMilestone = showNextTeaser ? nextUpcomingMilestone(currentAmount, participants) : null;
   const remainingToNext = nextMilestone ? Math.max(0, nextMilestone.amount - currentAmount) : 0;
-  const revealWindow = nextMilestone ? Math.max(150, nextMilestone.amount * 0.18) : 1;
-  const revealProgress = nextMilestone
-    ? Math.min(1, Math.max(0, 1 - remainingToNext / revealWindow))
-    : 0;
-  // Ease-in slik at det meste av skjerpingen skjer helt på tampen - de
-  // siste kronene skal føles som et crescendo.
-  const revealEased = revealProgress ** 2;
+  const revealEased = nextMilestone ? teaserReveal(currentAmount, nextMilestone) : 0;
   const teaserBlurPx = (1 - revealEased) * 7;
   const teaserScale = 1 + revealEased * 0.05;
   const teaserGlow = 0.55 * revealEased;
-  const teaserAlmostThere = revealProgress > 0.85;
+  const teaserAlmostThere = revealEased > 0.72;
   const teaserPulseDuration = 1.6 - revealEased * 1.1;
 
   const flamePct = timeToFraction(elapsedSeconds, estimatedSeconds) * 100;
